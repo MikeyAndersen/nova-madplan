@@ -1,0 +1,107 @@
+---
+import { env } from 'cloudflare:workers';
+import { COOKIE_NAME, COOKIE_MAX_AGE, signSession } from '../lib/auth';
+
+const secret = env.SITE_PASSWORD;
+let error = false;
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const password = String(data.get('password') ?? '');
+  if (password === secret) {
+    const token = await signSession(secret);
+    Astro.cookies.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: Astro.url.protocol === 'https:',
+      path: '/',
+      maxAge: COOKIE_MAX_AGE,
+    });
+    return Astro.redirect('/');
+  }
+  error = true;
+}
+---
+
+<!doctype html>
+<html lang="da">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Log ind · Madplan</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: #f4f1ea;
+        color: #2b2724;
+      }
+      .card {
+        width: 100%;
+        max-width: 22rem;
+        background: #fff;
+        border: 1px solid #e6e0d4;
+        border-radius: 1rem;
+        padding: 1.75rem 1.5rem;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+      }
+      h1 { font-size: 1.35rem; margin: 0 0 0.25rem; }
+      p.sub { margin: 0 0 1.25rem; color: #6b6358; font-size: 0.95rem; }
+      label { display: block; font-size: 0.9rem; margin-bottom: 0.4rem; font-weight: 600; }
+      input {
+        width: 100%;
+        padding: 0.85rem 0.9rem;
+        font-size: 1rem;
+        border: 1px solid #d8d0c2;
+        border-radius: 0.6rem;
+        background: #fbfaf6;
+      }
+      input:focus { outline: 2px solid #b5651d; border-color: #b5651d; }
+      button {
+        margin-top: 1rem;
+        width: 100%;
+        padding: 0.9rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #fff;
+        background: #b5651d;
+        border: none;
+        border-radius: 0.6rem;
+        cursor: pointer;
+      }
+      button:active { background: #99551a; }
+      .error {
+        margin: 0 0 1rem;
+        padding: 0.6rem 0.8rem;
+        background: #fbe6e3;
+        color: #9b2c20;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <form class="card" method="post" autocomplete="off">
+      <h1>Madplan & Beholdning</h1>
+      <p class="sub">Indtast kodeord for at fortsætte.</p>
+      {error && <p class="error">Forkert kodeord. Prøv igen.</p>}
+      <label for="password">Kodeord</label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        inputmode="text"
+        autofocus
+        required
+      />
+      <button type="submit">Log ind</button>
+    </form>
+  </body>
+</html>
