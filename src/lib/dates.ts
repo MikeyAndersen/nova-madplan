@@ -89,3 +89,19 @@ export function formatDa(iso: string): string {
 export function todayISO(): string {
   return ymd(new Date());
 }
+
+/** Læg n dage til en ISO-dato. */
+export function addDaysISO(iso: string, n: number): string {
+  const d = parseISO(iso);
+  d.setUTCDate(d.getUTCDate() + n);
+  return ymd(d);
+}
+
+/** Kort dansk dag+måned, fx "15. jun." */
+export function dayMonthDa(iso: string): string {
+  return new Intl.DateTimeFormat('da-DK', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(parseISO(iso));
+}

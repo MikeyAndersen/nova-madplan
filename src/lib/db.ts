@@ -147,6 +147,21 @@ export async function suggestMeal(
     .run();
 }
 
+/** Skift fleks-status for en dag (opretter rækken hvis nødvendigt). */
+export async function toggleFlex(
+  db: D1Database,
+  weekId: number,
+  weekday: number,
+): Promise<void> {
+  await ensureMeals(db, weekId);
+  await db
+    .prepare(
+      'UPDATE meals SET is_flex = CASE is_flex WHEN 1 THEN 0 ELSE 1 END WHERE week_id = ? AND weekday = ?',
+    )
+    .bind(weekId, weekday)
+    .run();
+}
+
 /** Opret den næste uge efter den seneste eksisterende uge (eller efter denne uge). */
 export async function createUpcomingWeek(db: D1Database): Promise<Week> {
   const latest = await db

@@ -1,0 +1,95 @@
+---
+import type { Meal } from '../lib/db';
+import { WEEKDAYS_DA, dayMonthDa } from '../lib/dates';
+
+interface Props {
+  meal: Meal;
+  dateISO: string;
+  readOnly?: boolean;
+}
+const { meal, dateISO, readOnly = false } = Astro.props;
+const dayName = WEEKDAYS_DA[meal.weekday - 1];
+const isFlex = meal.is_flex === 1;
+const isPlanned = Boolean(meal.title);
+const state = isFlex ? 'flex' : isPlanned ? 'planned' : 'empty';
+---
+
+<div class={`card meal meal-${state}`}>
+  <div class="row spread">
+    <span class="meal-day">{dayName}</span>
+    <span class="tag">{dayMonthDa(dateISO)}</span>
+  </div>
+
+  <div class="meal-body">
+    {isFlex && <div class="meal-title">🍳 Fleks-aften</div>}
+    {isPlanned && <div class={isFlex ? 'small muted' : 'meal-title'}>{meal.title}</div>}
+    {!isFlex && !isPlanned && <div class="meal-empty">Ingen plan endnu</div>}
+    {meal.cook && <div class="small muted">👩‍🍳 {meal.cook}</div>}
+    {meal.notes && <div class="small muted">{meal.notes}</div>}
+    {meal.recipe_url && (
+      <div class="small"><a href={meal.recipe_url} target="_blank" rel="noopener">Opskrift ↗</a></div>
+    )}
+  </div>
+
+  {!readOnly && (
+    <div class="row" style="gap:0.4rem; margin-top:0.6rem;">
+      <form method="post" action="/api/meals">
+        <input type="hidden" name="action" value="toggleFlex" />
+        <input type="hidden" name="weekId" value={meal.week_id} />
+        <input type="hidden" name="weekday" value={meal.weekday} />
+        <button class="btn-sm" type="submit">{isFlex ? 'Fjern fleks' : 'Fleks 🍳'}</button>
+      </form>
+      <details class="editor" style="margin-left:auto;">
+        <summary class="btn-sm" style="display:inline-block;">{isPlanned || isFlex ? 'Redigér' : 'Tilføj ret'}</summary>
+      </details>
+    </div>
+  )}
+
+  {!readOnly && (
+    <details class="editor" style="margin-top:0.5rem;">
+      <summary class="small">Redigér dag</summary>
+      <form method="post" action="/api/meals" style="margin-top:0.6rem;">
+        <input type="hidden" name="action" value="upsert" />
+        <input type="hidden" name="weekId" value={meal.week_id} />
+        <input type="hidden" name="weekday" value={meal.weekday} />
+        <div class="field">
+          <label>Ret</label>
+          <input name="title" value={meal.title ?? ''} placeholder="fx Spaghetti bolognese" />
+        </div>
+        <label class="row" style="gap:0.5rem; font-weight:600;">
+          <input type="checkbox" name="is_flex" value="1" checked={isFlex} style="width:auto;" />
+          Fleks-aften (ingen fast plan)
+        </label>
+        <div class="grid-2" style="margin-top:0.6rem;">
+          <div class="field">
+            <label>Hvem laver mad (valgfri)</label>
+            <input name="cook" value={meal.cook ?? ''} />
+          </div>
+          <div class="field">
+            <label>Opskrift-link (valgfri)</label>
+            <input name="recipe_url" type="url" value={meal.recipe_url ?? ''} placeholder="https://…" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Note (valgfri)</label>
+          <input name="notes" value={meal.notes ?? ''} />
+        </div>
+        <button class="btn-primary btn-block" type="submit">Gem</button>
+      </form>
+    </details>
+  )}
+</div>
+
+<style>
+  .meal { display: flex; flex-direction: column; }
+  .meal-day { font-weight: 700; }
+  .meal-body { margin-top: 0.4rem; flex: 1; }
+  .meal-title { font-size: 1.05rem; font-weight: 600; }
+  .meal-empty { color: var(--muted); font-style: italic; }
+  .meal-flex {
+    border-color: var(--accent-2);
+    border-left: 4px solid var(--accent-2);
+    background: #f1f6f1;
+  }
+  .meal-empty-state { opacity: 0.85; }
+</style>

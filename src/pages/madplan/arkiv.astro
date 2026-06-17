@@ -1,0 +1,40 @@
+---
+import { env } from 'cloudflare:workers';
+import Layout from '../../components/Layout.astro';
+import MealCard from '../../components/MealCard.astro';
+import { listWeeks, getWeekWithMeals, type Meal } from '../../lib/db';
+import { weekStatus, addDaysISO, dayMonthDa } from '../../lib/dates';
+
+const db = env.DB;
+const all = await listWeeks(db);
+const historic = all.filter((w) => weekStatus(w.start_date) === 'historisk'); // nyeste først (listWeeks er DESC)
+const data = await Promise.all(historic.map((w) => getWeekWithMeals(db, w.id)));
+
+function rangeLabel(start: string): string {
+  return `${dayMonthDa(start)} – ${dayMonthDa(addDaysISO(start, 6))}`;
+}
+function meal(meals: Meal[], weekday: number): Meal {
+  return meals.find((m) => m.weekday === weekday)!;
+}
+---
+
+<Layout title="Arkiv">
+  <h1>Arkiv</h1>
+  <p class="muted small">Tidligere uger — skrivebeskyttet, nyeste først.</p>
+
+  {data.length === 0 && <p class="empty">Ingen forgangne uger endnu.</p>}
+
+  {data.map(({ week, meals }) => (
+    <section>
+      <div class="section-head">
+        <h2>Uge {week.week_no}</h2>
+        <span class="count-pill">{rangeLabel(week.start_date)}</span>
+      </div>
+      <div class="cards">
+        {[1, 2, 3, 4, 5, 6, 7].map((wd) => (
+          <MealCard meal={meal(meals, wd)} dateISO={addDaysISO(week.start_date, wd - 1)} readOnly />
+        ))}
+      </div>
+    </section>
+  ))}
+</Layout>
