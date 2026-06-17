@@ -1,0 +1,102 @@
+---
+import { env } from 'cloudflare:workers';
+import Layout from '../components/Layout.astro';
+import ItemCard from '../components/ItemCard.astro';
+import { listInventory, listCategories, type Item } from '../lib/db';
+import { LOCATIONS, LOCATION_LABELS, isLocation } from '../lib/locations';
+
+const url = Astro.url;
+const q = url.searchParams.get('q')?.trim() ?? '';
+const category = url.searchParams.get('category')?.trim() ?? '';
+const locParam = url.searchParams.get('location')?.trim() ?? '';
+const locFilter = isLocation(locParam) ? locParam : undefined;
+
+const db = env.DB;
+const items = await listInventory(db, {
+  q: q || undefined,
+  category: category || undefined,
+  location: locFilter,
+});
+const categories = await listCategories(db);
+
+const byLoc: Record<string, Item[]> = Object.fromEntries(LOCATIONS.map((l) => [l, []]));
+for (const it of items) byLoc[it.location]?.push(it);
+
+const sections = locFilter ? [locFilter] : LOCATIONS;
+const filtering = Boolean(q || category || locFilter);
+---
+
+<Layout title="Beholdning">
+  <h1>Beholdning</h1>
+  <p class="muted small">Hvad har vi hjemme?</p>
+
+  <form class="toolbar" method="get">
+    <input type="search" name="q" value={q} placeholder="Søg vare…" aria-label="Søg" />
+    <select name="category" aria-label="Kategori">
+      <option value="">Alle kategorier</option>
+      {categories.map((c) => <option value={c} selected={c === category}>{c}</option>)}
+    </select>
+    <select name="location" aria-label="Lokation">
+      <option value="">Alle lokationer</option>
+      {LOCATIONS.map((l) => (
+        <option value={l} selected={l === locFilter}>{LOCATION_LABELS[l]}</option>
+      ))}
+    </select>
+    <button class="btn-primary" type="submit">Søg</button>
+    {filtering && <a class="btn" href="/beholdning">Nulstil</a>}
+  </form>
+
+  <details class="editor" style="margin-bottom:1rem;">
+    <summary class="btn btn-primary btn-block" style="text-align:center;">+ Tilføj vare manuelt</summary>
+    <form method="post" action="/api/inventory" class="card" style="margin-top:0.6rem;">
+      <input type="hidden" name="action" value="add" />
+      <div class="field">
+        <label>Navn</label>
+        <input name="name" required placeholder="fx Smør" />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Lokation</label>
+          <select name="location">
+            {LOCATIONS.map((l) => <option value={l}>{LOCATION_LABELS[l]}</option>)}
+          </select>
+        </div>
+        <div class="field">
+          <label>Antal</label>
+          <input name="quantity" type="number" min="0" step="1" value="1" />
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Enhed (valgfri)</label>
+          <input name="unit" placeholder="fx 250 g" />
+        </div>
+        <div class="field">
+          <label>Kategori (valgfri)</label>
+          <input name="category" placeholder="fx Mejeri" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Bedst før (valgfri)</label>
+        <input name="best_before" type="date" />
+      </div>
+      <button class="btn-primary btn-block" type="submit">Tilføj vare</button>
+    </form>
+  </details>
+
+  {sections.map((loc) => (
+    <section>
+      <div class="section-head">
+        <h2>{LOCATION_LABELS[loc]}</h2>
+        <span class="count-pill">{byLoc[loc].length} {byLoc[loc].length === 1 ? 'vare' : 'varer'}</span>
+      </div>
+      {byLoc[loc].length === 0 ? (
+        <p class="empty">{filtering ? 'Ingen varer matcher.' : 'Tom.'}</p>
+      ) : (
+        <div class="cards">
+          {byLoc[loc].map((it) => <ItemCard item={it} />)}
+        </div>
+      )}
+    </section>
+  ))}
+</Layout>
