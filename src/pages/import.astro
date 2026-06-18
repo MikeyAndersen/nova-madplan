@@ -67,6 +67,7 @@ const receipt = p.has('added')
                   Inkludér
                 </label>
                 <input type="hidden" name={`name_${i}`} value={it.name} />
+                <input type="hidden" name={`unitprice_${i}`} value={it.unitPrice ?? ''} />
                 <div class="field">
                   <label>Vare</label>
                   <input name={`name_disp_${i}`} value={it.name} disabled />

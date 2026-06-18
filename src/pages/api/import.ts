@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { addItem, mergeOrInsert, getCurrentWeek, suggestMeal, type NewItem } from '../../lib/db';
+import { addItem, mergeOrInsert, getCurrentWeek, suggestMeal, recordPrice, type NewItem } from '../../lib/db';
 import { isLocation } from '../../lib/locations';
 
 function field(data: FormData, key: string): string {
@@ -42,6 +42,12 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     }
     added++;
     if (location === 'ovrigt') ovrigt++;
+
+    // Gem prishistorik hvis varen har en stk-pris fra ordren.
+    const unitPrice = Number(field(data, `unitprice_${i}`));
+    if (unitPrice > 0) {
+      await recordPrice(db, { name, unit: item.unit ?? null, unitPrice, quantity: item.quantity });
+    }
   }
 
   // Opskrifter → forslag i madplanen (denne uge).

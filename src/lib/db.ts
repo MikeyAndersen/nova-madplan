@@ -4,6 +4,7 @@
 import type { Location } from './locations';
 import { LOCATIONS } from './locations';
 import { isoWeek, mondayOf, nextWeekStart, todayISO } from './dates';
+import type { PriceRow } from './prices';
 
 export interface Week {
   id: number;
@@ -336,6 +337,40 @@ export async function countByLocation(db: D1Database): Promise<Record<Location, 
     if (r.location in counts) counts[r.location] = r.c;
   }
   return counts;
+}
+
+// ---------- Prishistorik ----------
+
+export async function recordPrice(
+  db: D1Database,
+  p: { name: string; unit: string | null; unitPrice: number; quantity?: number | null },
+): Promise<void> {
+  await db
+    .prepare(
+      'INSERT INTO price_history (name, name_key, unit, unit_price, quantity, recorded_at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    .bind(
+      p.name,
+      p.name.trim().toLowerCase(),
+      p.unit ?? null,
+      p.unitPrice,
+      p.quantity ?? null,
+      todayISO(),
+    )
+    .run();
+}
+
+export async function listPrices(db: D1Database, q?: string): Promise<PriceRow[]> {
+  const where = q ? ' WHERE name LIKE ?' : '';
+  const binds = q ? [`%${q}%`] : [];
+  const { results } = await db
+    .prepare(
+      `SELECT name, name_key, unit, unit_price, recorded_at FROM price_history${where}
+       ORDER BY name_key, recorded_at DESC`,
+    )
+    .bind(...binds)
+    .all<PriceRow>();
+  return results;
 }
 
 export async function expiringSoon(db: D1Database, days = 3): Promise<Item[]> {
