@@ -36,6 +36,24 @@ function meal(meals: Meal[], weekday: number): Meal {
         </h2>
         <span class="count-pill">{rangeLabel(week.start_date)}</span>
       </div>
+
+      <details class="quickfill" style="margin-bottom:0.9rem;">
+        <summary class="btn btn-block">⚡ Hurtig udfyldning</summary>
+        <form method="post" action="/api/meals" class="card" style="margin-top:0.6rem;">
+          <input type="hidden" name="action" value="quickfill" />
+          <input type="hidden" name="weekId" value={week.id} />
+          <p class="small muted" style="margin-top:0;">
+            Én linje pr. dag — fx <code>Mandag: hel kylling</code>. Dage du ikke nævner, røres ikke.
+          </p>
+          <textarea
+            name="raw"
+            rows="7"
+            placeholder={'Mandag: hel kylling\nTirsdag: Sandwich (bagels)\nOnsdag: Salsiccia pasta\nTorsdag: rugbrød\nFredag: Lasagne\nLørdag: karry\nSøndag: Ramen eller karry'}
+          ></textarea>
+          <button class="btn-primary btn-block" type="submit" style="margin-top:0.5rem;">Udfyld ugen</button>
+        </form>
+      </details>
+
       <div class="cards">
         {[1, 2, 3, 4, 5, 6, 7].map((wd) => (
           <MealCard meal={meal(meals, wd)} dateISO={addDaysISO(week.start_date, wd - 1)} />

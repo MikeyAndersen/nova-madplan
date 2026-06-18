@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { upsertMeal, toggleFlex, createUpcomingWeek } from '../../lib/db';
+import { upsertMeal, toggleFlex, createUpcomingWeek, setWeekTitles } from '../../lib/db';
+import { parseWeekPlan } from '../../lib/weekplan';
 
 function str(data: FormData, key: string): string {
   return String(data.get(key) ?? '').trim();
@@ -33,6 +34,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     const weekId = Number(str(data, 'weekId'));
     const weekday = Number(str(data, 'weekday'));
     if (weekId && weekday >= 1 && weekday <= 7) await toggleFlex(db, weekId, weekday);
+  } else if (action === 'quickfill') {
+    const weekId = Number(str(data, 'weekId'));
+    const raw = String(data.get('raw') ?? '');
+    if (weekId) await setWeekTitles(db, weekId, parseWeekPlan(raw));
   } else if (action === 'createUpcoming') {
     await createUpcomingWeek(db);
   }

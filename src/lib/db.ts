@@ -147,6 +147,20 @@ export async function suggestMeal(
     .run();
 }
 
+/** Hurtig udfyldning: sæt titler for flere dage i én uge på én gang. */
+export async function setWeekTitles(
+  db: D1Database,
+  weekId: number,
+  entries: { weekday: number; title: string }[],
+): Promise<number> {
+  await ensureMeals(db, weekId);
+  const valid = entries.filter((e) => e.weekday >= 1 && e.weekday <= 7 && e.title);
+  if (!valid.length) return 0;
+  const stmt = db.prepare('UPDATE meals SET title = ? WHERE week_id = ? AND weekday = ?');
+  await db.batch(valid.map((e) => stmt.bind(e.title, weekId, e.weekday)));
+  return valid.length;
+}
+
 /** Skift fleks-status for en dag (opretter rækken hvis nødvendigt). */
 export async function toggleFlex(
   db: D1Database,
