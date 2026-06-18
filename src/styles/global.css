@@ -3,6 +3,7 @@
 :root {
   color-scheme: light;
 
+  /* Lyst tema (standard) */
   --bg: #f4f1ea;
   --surface: #ffffff;
   --surface-2: #fbfaf6;
@@ -12,18 +13,78 @@
 
   --accent: #a25415; /* terracotta — primær (AA-kontrast på lys baggrund + hvid tekst) */
   --accent-ink: #ffffff;
+  --accent-active: #874711;
   --accent-2: #4a7c59; /* salviegrøn — fleks / friskt */
   --danger: #9b2c20;
   --warn-bg: #fbf0d8;
   --warn-ink: #8a5a06;
 
+  --nav-bg: rgba(244, 241, 234, 0.92);
+  --flex-bg: #f1f6f1;
+  --up-bg: #fbe6e3;
+  --up-ink: #9b2c20;
+  --down-bg: #e7f1ea;
+  --down-ink: #2f6b46;
+
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.05);
+
   --radius: 0.75rem;
   --radius-sm: 0.5rem;
   --gap: 1rem;
   --maxw: 44rem;
-
-  --shadow: 0 6px 24px rgba(0, 0, 0, 0.05);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Mørkt tema — sat med en navngivet blok for at undgå gentagelse */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1b1916;
+    --surface: #252220;
+    --surface-2: #2b2825;
+    --border: #3a352f;
+    --ink: #ece7dd;
+    --muted: #a59c8e;
+    --accent: #e08a4d;
+    --accent-ink: #1b1916;
+    --accent-active: #c9743a;
+    --accent-2: #74b089;
+    --danger: #e98c82;
+    --warn-bg: #38301d;
+    --warn-ink: #e6c069;
+    --nav-bg: rgba(27, 25, 22, 0.92);
+    --flex-bg: #20302a;
+    --up-bg: #3a2420;
+    --up-ink: #f0a59c;
+    --down-bg: #1f3328;
+    --down-ink: #8fd3a8;
+    --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Manuel override: tving mørkt uanset systemindstilling */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1916;
+  --surface: #252220;
+  --surface-2: #2b2825;
+  --border: #3a352f;
+  --ink: #ece7dd;
+  --muted: #a59c8e;
+  --accent: #e08a4d;
+  --accent-ink: #1b1916;
+  --accent-active: #c9743a;
+  --accent-2: #74b089;
+  --danger: #e98c82;
+  --warn-bg: #38301d;
+  --warn-ink: #e6c069;
+  --nav-bg: rgba(27, 25, 22, 0.92);
+  --flex-bg: #20302a;
+  --up-bg: #3a2420;
+  --up-ink: #f0a59c;
+  --down-bg: #1f3328;
+  --down-ink: #8fd3a8;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -60,7 +121,7 @@ h2 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; }
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(244, 241, 234, 0.92);
+  background: var(--nav-bg);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
 }
@@ -68,13 +129,31 @@ h2 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; }
   max-width: var(--maxw);
   margin: 0 auto;
   display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+}
+.nav-links {
+  display: flex;
   gap: 0.25rem;
-  padding: 0.5rem 0.5rem;
+  flex: 1;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
-.nav-inner::-webkit-scrollbar { display: none; }
+.nav-links::-webkit-scrollbar { display: none; }
+.theme-toggle {
+  flex: 0 0 auto;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.theme-toggle:active { background: var(--border); }
 .nav a {
   flex: 0 0 auto;
   padding: 0.5rem 0.8rem;
@@ -159,7 +238,7 @@ button:active, .btn:active { background: var(--border); }
   border-color: var(--accent);
   color: var(--accent-ink);
 }
-.btn-primary:active { background: #874711; }
+.btn-primary:active { background: var(--accent-active); }
 .btn-danger { color: var(--danger); }
 .btn-icon { padding: 0.45rem 0.6rem; line-height: 1; }
 .btn-sm { padding: 0.35rem 0.6rem; min-height: 2.1rem; font-size: 0.9rem; }

@@ -19,8 +19,11 @@ function isActive(href: string): boolean {
 
 <nav class="nav">
   <div class="nav-inner">
-    {links.map((l) => (
-      <a href={l.href} class={isActive(l.href) ? 'active' : ''}>{l.label}</a>
-    ))}
+    <div class="nav-links">
+      {links.map((l) => (
+        <a href={l.href} class={isActive(l.href) ? 'active' : ''}>{l.label}</a>
+      ))}
+    </div>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Skift lyst/mørkt tema" title="Skift tema">🌙</button>
   </div>
 </nav>
