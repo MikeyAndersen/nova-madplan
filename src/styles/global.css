@@ -8,9 +8,9 @@
   --surface-2: #fbfaf6;
   --border: #e6e0d4;
   --ink: #2b2724;
-  --muted: #6b6358;
+  --muted: #5c5349;
 
-  --accent: #b5651d; /* terracotta — primær */
+  --accent: #a25415; /* terracotta — primær (AA-kontrast på lys baggrund + hvid tekst) */
   --accent-ink: #ffffff;
   --accent-2: #4a7c59; /* salviegrøn — fleks / friskt */
   --danger: #9b2c20;
@@ -159,7 +159,7 @@ button:active, .btn:active { background: var(--border); }
   border-color: var(--accent);
   color: var(--accent-ink);
 }
-.btn-primary:active { background: #99551a; }
+.btn-primary:active { background: #874711; }
 .btn-danger { color: var(--danger); }
 .btn-icon { padding: 0.45rem 0.6rem; line-height: 1; }
 .btn-sm { padding: 0.35rem 0.6rem; min-height: 2.1rem; font-size: 0.9rem; }
