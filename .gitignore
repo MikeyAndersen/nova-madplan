@@ -1,24 +1,8 @@
-# build output
-dist/
-# generated types
-.astro/
-
-# dependencies
-node_modules/
-
-# logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-
 # environment variables
 .env
 .env.production
-.dev.vars
 
-# ny FastAPI-stack: runtime-data og migrering
+# FastAPI-stack: runtime-data, migrering, python
 data/
 *.db
 d1_dump.sql
@@ -28,11 +12,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-# wrangler / cloudflare local state
-.wrangler/
-
-# macOS-specific files
+# editor / OS
 .DS_Store
-
-# jetbrains setting folder
 .idea/
+.vscode/
