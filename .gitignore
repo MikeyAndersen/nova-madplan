@@ -18,6 +18,16 @@ pnpm-debug.log*
 .env.production
 .dev.vars
 
+# ny FastAPI-stack: runtime-data og migrering
+data/
+*.db
+d1_dump.sql
+old_inventory_items.csv
+old_price_history.csv
+__pycache__/
+.pytest_cache/
+.venv/
+
 # wrangler / cloudflare local state
 .wrangler/
 

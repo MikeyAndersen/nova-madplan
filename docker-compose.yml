@@ -1,0 +1,15 @@
+services:
+  madplan-api:
+    build: ./api
+    container_name: madplan-api
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8400:8000"   # kun til LAN-verifikation/frontend; internt bruges madplan-api:8000
+    volumes:
+      - ./data:/data
+
+networks:
+  default:
+    name: lifehub_net
+    external: true
