@@ -58,3 +58,26 @@ class DayUpdate(BaseModel):
     status: DayStatus
     dish_id: int | None = None
     note: str | None = None
+
+
+# ── Forslag (spec §2.4) ─────────────────────────────────────────────
+class Suggestion(BaseModel):
+    date: str
+    dish_id: int
+    dish_name: str
+    reason: str
+    confidence: float
+
+
+class SuggestionSet(BaseModel):
+    week_start: str
+    generated_by: str
+    quality: Literal["fast", "reviewed"] = "fast"
+    inventory_hash: str | None = None
+    suggestions: list[Suggestion] = []
+    updated_at: str
+
+
+class AcceptBody(BaseModel):
+    date: str  # YYYY-MM-DD
+    dish_id: int

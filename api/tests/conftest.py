@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _tmpdir = tempfile.mkdtemp(prefix="madplan-test-")
 os.environ["DATABASE_PATH"] = os.path.join(_tmpdir, "madplan.db")
 os.environ["LIFEHUB_API_TOKEN"] = "test-token"
+os.environ["SUGGEST_AUTO"] = "false"  # ingen baggrunds-triggere/scheduler i tests
 
 from fastapi.testclient import TestClient  # noqa: E402
 

@@ -3,9 +3,9 @@ import sqlite3
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from . import config, db
+from . import config, db, suggest
 from .auth import require_api_token
 from .models import Day, DayUpdate, WeekPlan
 
@@ -78,8 +78,28 @@ def get_weekplan(start: str = Query(..., description="YYYY-MM-DD; rundes ned til
         return build_weekplan(conn, week_start)
 
 
+def apply_day_update(conn, d, status, dish_id, note, now) -> None:
+    """Kernen bag PUT /day og forslags-accept: upsert dagen og hold historik +
+    last_made i sync med cooked-status. Antager dish_id allerede er valideret."""
+    old = conn.execute("SELECT dish_id FROM history WHERE date = ?", (d.isoformat(),)).fetchone()
+    conn.execute(
+        "INSERT INTO weekplan_days(date, dish_id, status, note, updated_at)"
+        " VALUES(?,?,?,?,?) ON CONFLICT(date) DO UPDATE SET"
+        " dish_id=excluded.dish_id, status=excluded.status,"
+        " note=excluded.note, updated_at=excluded.updated_at",
+        (d.isoformat(), dish_id, status, note, now),
+    )
+    # Historik holdes 1:1 med cooked-status for datoen; last_made følger historikken.
+    conn.execute("DELETE FROM history WHERE date = ?", (d.isoformat(),))
+    if status == "cooked":
+        conn.execute("INSERT INTO history(date, dish_id, cooked_at) VALUES(?,?,?)",
+                     (d.isoformat(), dish_id, now))
+    for did in {dish_id, old["dish_id"] if old else None} - {None}:
+        _recompute_last_made(conn, did)
+
+
 @router.put("/day", response_model=WeekPlan)
-def upsert_day(update: DayUpdate) -> WeekPlan:
+def upsert_day(update: DayUpdate, bg: BackgroundTasks) -> WeekPlan:
     """Sæt/ret én dag. `cooked` skriver historik og opdaterer `last_made` (spec 2.2)."""
     d = _parse_date(update.date)
     if update.status == "empty":
@@ -94,21 +114,9 @@ def upsert_day(update: DayUpdate) -> WeekPlan:
             dish = conn.execute("SELECT id FROM dishes WHERE id = ?", (update.dish_id,)).fetchone()
             if not dish:
                 raise HTTPException(status_code=404, detail=f"Dish {update.dish_id} not found")
-
-        old = conn.execute("SELECT dish_id FROM history WHERE date = ?", (d.isoformat(),)).fetchone()
-        conn.execute(
-            "INSERT INTO weekplan_days(date, dish_id, status, note, updated_at)"
-            " VALUES(?,?,?,?,?) ON CONFLICT(date) DO UPDATE SET"
-            " dish_id=excluded.dish_id, status=excluded.status,"
-            " note=excluded.note, updated_at=excluded.updated_at",
-            (d.isoformat(), update.dish_id, update.status, update.note, now),
-        )
-        # Historik holdes 1:1 med cooked-status for datoen; last_made følger historikken.
-        conn.execute("DELETE FROM history WHERE date = ?", (d.isoformat(),))
-        if update.status == "cooked":
-            conn.execute("INSERT INTO history(date, dish_id, cooked_at) VALUES(?,?,?)",
-                         (d.isoformat(), update.dish_id, now))
-        for dish_id in {update.dish_id, old["dish_id"] if old else None} - {None}:
-            _recompute_last_made(conn, dish_id)
-
-        return build_weekplan(conn, monday_of(d))
+        apply_day_update(conn, d, update.status, update.dish_id, update.note, now)
+        plan = build_weekplan(conn, monday_of(d))
+    # Cooked/skipped ændrer historik/last_made → genberegn næste uges forslag (§4.1).
+    if config.SUGGEST_AUTO and update.status in ("cooked", "skipped"):
+        bg.add_task(suggest.generate, True)
+    return plan
