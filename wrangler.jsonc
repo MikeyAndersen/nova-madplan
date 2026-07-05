@@ -13,5 +13,10 @@
 	},
 	"observability": {
 		"enabled": true
+	},
+	"vars": {
+		"MADPLAN_API_BASE": "http://localhost:8400",
+		"LIFEHUB_API_TOKEN": "dev",
+		"SITE_PASSWORD": "dev"
 	}
 }
