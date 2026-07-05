@@ -1,0 +1,26 @@
+---
+const path = Astro.url.pathname;
+
+const links: { href: string; label: string }[] = [
+  { href: '/', label: 'Forside' },
+  { href: '/madplan', label: 'Madplan' },
+  { href: '/forslag', label: 'Forslag' },
+  { href: '/retter', label: 'Retter' },
+];
+
+function isActive(href: string): boolean {
+  if (href === '/') return path === '/';
+  return path === href || path.startsWith(href + '/');
+}
+---
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-links">
+      {links.map((l) => (
+        <a href={l.href} class={isActive(l.href) ? 'active' : ''}>{l.label}</a>
+      ))}
+    </div>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Skift lyst/mørkt tema" title="Skift tema">🌙</button>
+  </div>
+</nav>
