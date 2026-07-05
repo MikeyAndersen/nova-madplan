@@ -1,0 +1,133 @@
+---
+import Layout from '../components/Layout.astro';
+import { getApi, ApiError } from '../lib/api';
+import type { Dish } from '../lib/api.types';
+
+const hasError = Astro.url.searchParams.get('error') === '1';
+const api = await getApi();
+let dishes: Dish[] = [];
+let err = '';
+try {
+  dishes = await api.listDishes(true);
+} catch (e) {
+  err = e instanceof ApiError ? `Kunne ikke hente retter (${e.status}).` : 'Kunne ikke nå tjenesten.';
+}
+const active = dishes.filter((d) => d.active);
+const inactive = dishes.filter((d) => !d.active);
+---
+
+<Layout title="Retter">
+  <h1>Ret-katalog</h1>
+  {hasError && <p class="notice">Handlingen kunne ikke gennemføres. Prøv igen.</p>}
+  {err && <p class="notice">{err}</p>}
+
+  <form method="post" action="/api/dishes" class="card">
+    <input type="hidden" name="action" value="create" />
+    <div class="field"><label>Ny ret</label><input name="name" required placeholder="fx Tacos" /></div>
+    <label class="row" style="gap:0.5rem; font-weight:600;">
+      <input type="checkbox" name="recurring_weekly" value="1" style="width:auto;" /> Fast ugentlig ret
+    </label>
+    <button class="btn-primary btn-block" type="submit" style="margin-top:0.5rem;">Tilføj ret</button>
+  </form>
+
+  <div class="section-head" style="margin-top:1rem;">
+    <h2>Aktive</h2>
+    <span class="count-pill">{active.length}</span>
+  </div>
+  <div class="cards">
+    {active.map((d) => (
+      <div class="card dish">
+        <div class="row spread">
+          <strong>{d.name}</strong>
+          {d.recurring_weekly && <span class="tag">Fast</span>}
+        </div>
+        {d.last_made && <div class="small muted">Sidst lavet: {d.last_made}</div>}
+        {d.tags.length > 0 && <div class="small muted">{d.tags.join(' · ')}</div>}
+        <div class="dish-actions">
+          <details class="dish-edit">
+            <summary class="edit-toggle">✏️ Redigér</summary>
+            <form method="post" action="/api/dishes" class="dish-edit-form">
+              <input type="hidden" name="action" value="update" />
+              <input type="hidden" name="id" value={d.id} />
+              <div class="field"><label>Navn</label><input name="name" value={d.name} required /></div>
+              <label class="row" style="gap:0.5rem; font-weight:600;">
+                <input type="checkbox" name="recurring_weekly" value="1" checked={d.recurring_weekly} style="width:auto;" />
+                Fast ugentlig ret
+              </label>
+              <button class="btn-primary btn-block" type="submit" style="margin-top:0.5rem;">Gem</button>
+            </form>
+          </details>
+          <form method="post" action="/api/dishes">
+            <input type="hidden" name="action" value="toggle" />
+            <input type="hidden" name="id" value={d.id} />
+            <input type="hidden" name="active" value="0" />
+            <button class="btn-sm" type="submit">Deaktivér</button>
+          </form>
+        </div>
+      </div>
+    ))}
+    {active.length === 0 && !err && <p class="empty">Ingen aktive retter endnu.</p>}
+  </div>
+
+  {inactive.length > 0 && (
+    <>
+      <div class="section-head" style="margin-top:1.5rem;">
+        <h2>Inaktive</h2>
+        <span class="count-pill">{inactive.length}</span>
+      </div>
+      <div class="cards">
+        {inactive.map((d) => (
+          <div class="card dish dish-inactive">
+            <div class="row spread">
+              <strong>{d.name}</strong>
+              {d.recurring_weekly && <span class="tag">Fast</span>}
+            </div>
+            {d.last_made && <div class="small muted">Sidst lavet: {d.last_made}</div>}
+            <div class="dish-actions">
+              <form method="post" action="/api/dishes">
+                <input type="hidden" name="action" value="toggle" />
+                <input type="hidden" name="id" value={d.id} />
+                <input type="hidden" name="active" value="1" />
+                <button class="btn-sm" type="submit">Aktivér igen</button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )}
+</Layout>
+
+<style>
+  .dish { display: flex; flex-direction: column; }
+  .dish-inactive { opacity: 0.65; }
+  .dish-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    margin-top: 0.6rem;
+  }
+  .dish-edit { margin-right: auto; }
+  .dish-edit > summary.edit-toggle {
+    list-style: none;
+    display: inline-block;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.75rem;
+    min-height: 2.1rem;
+    user-select: none;
+  }
+  .dish-edit > summary.edit-toggle::-webkit-details-marker { display: none; }
+  .dish-edit > summary.edit-toggle:active { background: var(--border); }
+  .dish-edit[open] > summary.edit-toggle {
+    background: var(--border);
+    margin-bottom: 0.6rem;
+  }
+  .dish-edit[open] { width: 100%; margin-right: 0; }
+</style>
