@@ -1,0 +1,109 @@
+---
+import type { Day, Dish } from '../lib/api.types';
+import DishPicker from './DishPicker.astro';
+import { dayMonthDa } from '../lib/dates';
+
+interface Props {
+  day: Day;
+  dishes: Dish[];
+  weekStart: string;
+  readOnly?: boolean;
+}
+const { day, dishes, weekStart, readOnly = false } = Astro.props;
+const planned = day.status === 'planned' || day.status === 'cooked';
+const state = day.status === 'cooked' ? 'cooked' : planned ? 'planned' : 'empty';
+---
+
+<div class={`card meal meal-${state}`}>
+  <div class="row spread">
+    <span class="meal-day">{day.weekday}</span>
+    <span class="tag">{dayMonthDa(day.date)}</span>
+  </div>
+
+  <div class="meal-body">
+    {day.dish_name && <div class="meal-title">{day.status === 'cooked' ? '✅ ' : ''}{day.dish_name}</div>}
+    {!day.dish_name && <div class="meal-empty">Ingen plan endnu</div>}
+    {day.note && <div class="small muted">{day.note}</div>}
+    {day.status === 'skipped' && <div class="small muted">Sprunget over</div>}
+  </div>
+
+  {!readOnly && (
+    <div class="meal-actions">
+      <details class="meal-edit">
+        <summary class="edit-toggle">{planned ? '✏️ Redigér' : '+ Tilføj ret'}</summary>
+        <form method="post" action="/api/day" class="meal-edit-form">
+          <input type="hidden" name="date" value={day.date} />
+          <input type="hidden" name="week_start" value={weekStart} />
+          <input type="hidden" name="status" value="planned" />
+          <div class="field">
+            <label>Ret</label>
+            <DishPicker dishes={dishes} date={day.date} />
+          </div>
+          <div class="field">
+            <label>Note (valgfri)</label>
+            <input name="note" value={day.note ?? ''} />
+          </div>
+          <button class="btn-primary btn-block" type="submit">Gem</button>
+        </form>
+      </details>
+      {day.status === 'planned' && day.dish_id != null && (
+        <form method="post" action="/api/day">
+          <input type="hidden" name="date" value={day.date} />
+          <input type="hidden" name="week_start" value={weekStart} />
+          <input type="hidden" name="status" value="cooked" />
+          <input type="hidden" name="dish_id" value={day.dish_id} />
+          <button class="btn-sm" type="submit">Markér tilberedt</button>
+        </form>
+      )}
+      {day.status !== 'empty' && (
+        <form method="post" action="/api/day">
+          <input type="hidden" name="date" value={day.date} />
+          <input type="hidden" name="week_start" value={weekStart} />
+          <input type="hidden" name="status" value="empty" />
+          <button class="btn-sm" type="submit">Ryd</button>
+        </form>
+      )}
+    </div>
+  )}
+</div>
+
+<style>
+  .meal { display: flex; flex-direction: column; }
+  .meal-day { font-weight: 700; }
+  .meal-body { margin-top: 0.4rem; flex: 1; }
+  .meal-title { font-size: 1.05rem; font-weight: 600; }
+  .meal-empty { color: var(--muted); font-style: italic; }
+
+  .meal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    margin-top: 0.6rem;
+  }
+  .meal-edit { margin-left: auto; }
+
+  /* Summary stylet som rigtig knap */
+  .meal-edit > summary.edit-toggle {
+    list-style: none;
+    display: inline-block;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.75rem;
+    min-height: 2.1rem;
+    user-select: none;
+  }
+  .meal-edit > summary.edit-toggle::-webkit-details-marker { display: none; }
+  .meal-edit > summary.edit-toggle:active { background: var(--border); }
+  .meal-edit[open] > summary.edit-toggle {
+    background: var(--border);
+    margin-bottom: 0.6rem;
+  }
+  /* Når åben: fyld hele bredden så formularen ikke klemmes sammen */
+  .meal-edit[open] { width: 100%; margin-left: 0; }
+</style>

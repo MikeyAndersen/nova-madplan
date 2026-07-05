@@ -1,0 +1,33 @@
+---
+import type { Dish } from '../lib/api.types';
+
+interface Props {
+  dishes: Dish[];
+  date: string;
+}
+const { dishes, date } = Astro.props;
+const listId = `dishes-${date}`;
+---
+
+<datalist id={listId}>
+  {dishes.map((d) => <option value={d.name} data-id={d.id}></option>)}
+</datalist>
+<input class="dish-input" list={listId} name="dish_name_display" placeholder="søg eller skriv ny ret…" autocomplete="off" />
+<input type="hidden" name="dish_id" value="" />
+<input type="hidden" name="new_dish_name" value="" />
+<script is:inline define:vars={{ listId }}>
+  (function () {
+    var form = document.currentScript.closest('form');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      var disp = form.querySelector('input[name="dish_name_display"]');
+      var list = document.getElementById(listId);
+      var hiddenId = form.querySelector('input[name="dish_id"]');
+      var hiddenNew = form.querySelector('input[name="new_dish_name"]');
+      var val = ((disp && disp.value) || '').trim();
+      var match = list && Array.prototype.find.call(list.options, function (o) { return o.value === val; });
+      if (match) { hiddenId.value = match.getAttribute('data-id'); hiddenNew.value = ''; }
+      else { hiddenId.value = ''; hiddenNew.value = val; }
+    });
+  })();
+</script>

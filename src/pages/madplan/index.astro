@@ -1,0 +1,40 @@
+---
+import Layout from '../../components/Layout.astro';
+import MealCard from '../../components/MealCard.astro';
+import { getApi, ApiError } from '../../lib/api';
+import { mondayOf, addDaysISO, dayMonthDa } from '../../lib/dates';
+import type { WeekPlan, Dish } from '../../lib/api.types';
+
+const startParam = Astro.url.searchParams.get('start');
+const hasError = Astro.url.searchParams.get('error') === '1';
+const api = await getApi();
+let plan: WeekPlan | null = null;
+let dishes: Dish[] = [];
+let loadError = '';
+try {
+  plan = startParam ? await api.getWeekplan(startParam) : await api.getCurrentWeekplan();
+  dishes = await api.listDishes(false);
+} catch (e) {
+  loadError = e instanceof ApiError ? `Kunne ikke hente madplanen (${e.status}).` : 'Kunne ikke nå madplan-tjenesten.';
+}
+const ws = plan?.week_start ?? mondayOf(new Date());
+const prev = addDaysISO(ws, -7);
+const next = addDaysISO(ws, 7);
+const range = `${dayMonthDa(ws)} – ${dayMonthDa(addDaysISO(ws, 6))}`;
+---
+
+<Layout title="Madplan">
+  <h1>Madplan</h1>
+  {hasError && <p class="notice">Handlingen kunne ikke gennemføres. Prøv igen.</p>}
+  {loadError && <p class="notice">{loadError}</p>}
+  <div class="section-head">
+    <a class="count-pill" href={`/madplan?start=${prev}`}>‹ Forrige</a>
+    <h2>{range}</h2>
+    <a class="count-pill" href={`/madplan?start=${next}`}>Næste ›</a>
+  </div>
+  {plan && (
+    <div class="cards">
+      {plan.days.map((d) => <MealCard day={d} dishes={dishes} weekStart={ws} />)}
+    </div>
+  )}
+</Layout>
