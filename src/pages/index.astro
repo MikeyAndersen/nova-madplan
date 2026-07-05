@@ -1,0 +1,26 @@
+---
+import Layout from '../components/Layout.astro';
+import MealCard from '../components/MealCard.astro';
+import { getApi, ApiError } from '../lib/api';
+import type { WeekPlan } from '../lib/api.types';
+
+const api = await getApi();
+let plan: WeekPlan | null = null;
+let err = '';
+try {
+  plan = await api.getCurrentWeekplan();
+} catch (e) {
+  err = e instanceof ApiError ? `Kunne ikke hente ugen (${e.status}).` : 'Kunne ikke nå madplan-tjenesten.';
+}
+---
+
+<Layout title="Oversigt">
+  <h1>Madplan</h1>
+  {err && <p class="notice">{err}</p>}
+  <div class="section-head">
+    <h2>Denne uge</h2>
+    <a class="count-pill" href="/madplan">Redigér →</a>
+  </div>
+  {plan && <div class="cards">{plan.days.map((d) => <MealCard day={d} dishes={[]} weekStart={plan.week_start} readOnly />)}</div>}
+  <p class="muted small" style="margin-top:1rem;"><a href="/forslag">Se ugens forslag →</a></p>
+</Layout>

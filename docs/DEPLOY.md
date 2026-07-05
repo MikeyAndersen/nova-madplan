@@ -129,3 +129,48 @@ curl -s      -H "Authorization: Bearer <A>" http://localhost:8400/api/suggestion
 
 Internt: brain → `http://madplan-api:8000`; madplan → `http://brain:8300` og
 `http://ollama:11434`.
+
+## Fase 7 — Frontend (Cloudflare Workers/Pages)
+
+Astro-SSR-frontenden (repo-roden) deployes som Cloudflare Worker på
+`madplan.nova-tech.dk` og taler med FastAPI-backenden via en server-side BFF —
+browseren ser aldrig backend-tokenet.
+
+### 1) Tunnel-hostname til backenden
+
+På LXC 103 tilføjes et public hostname i den eksisterende cloudflared-config
+(samme tunnel som `ha.nova-tech.dk`):
+
+```
+madplan-api.nova-tech.dk → http://localhost:8400
+```
+
+Valgfri hærdning (anbefalet): læg en Cloudflare Access-policy på
+`madplan-api.nova-tech.dk` med en service-token, så kun Workeren kan nå den.
+Bearer-tokenet beskytter i forvejen alle endpoints.
+
+### 2) Env vars på Workeren
+
+Sættes som secrets/vars på `madplan`-Workeren (dashboard eller
+`wrangler secret put`) — værdierne i `wrangler.jsonc`'s `vars`-blok er kun
+dev-pladsholdere:
+
+| Nøgle | Værdi |
+|---|---|
+| `MADPLAN_API_BASE` | `https://madplan-api.nova-tech.dk` |
+| `LIFEHUB_API_TOKEN` | `<A>` — samme som backendens token A |
+| `SITE_PASSWORD` | det eksisterende delte site-password |
+
+### 3) Deploy
+
+```bash
+npm ci && npm run build
+npx wrangler deploy
+```
+
+### 4) Accept-kriterier før oprydning
+
+Den gamle D1-database + binding dekommissioneres **først** når kriterierne i
+spec §3.5 er verificeret på det deployede site: login virker, ugeplanen kan
+redigeres, forslag kan accepteres (enkeltdag + hel uge), fejlbanner vises når
+backenden er nede, og tokenet optræder ikke i klient-bundlet.
