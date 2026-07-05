@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Spejlæg">
+  <rect width="32" height="32" rx="7" fill="#a25415"/>
+  <!-- æggehvide (uregelmæssig "stegt" form) -->
+  <g fill="#fffdf7">
+    <ellipse cx="16" cy="16.5" rx="10.5" ry="9.4"/>
+    <circle cx="7.4" cy="11.3" r="3.3"/>
+    <circle cx="25.2" cy="20.4" r="2.7"/>
+    <circle cx="21.8" cy="9.4" r="2.2"/>
+    <circle cx="10.5" cy="24.6" r="2.4"/>
+  </g>
+  <!-- blomme med highlight -->
+  <circle cx="14.3" cy="14.6" r="4.9" fill="#f3a531"/>
+  <circle cx="12.5" cy="12.8" r="1.6" fill="#f9cd7e"/>
+</svg>

@@ -1,0 +1,17 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2026-06-17",
+	"compatibility_flags": ["global_fetch_strictly_public"],
+	"name": "madplan",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"routes": [
+		{ "pattern": "madplan.nova-tech.dk", "custom_domain": true }
+	],
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	}
+}
