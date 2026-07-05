@@ -1,0 +1,87 @@
+---
+import Layout from '../components/Layout.astro';
+import { getApi, ApiError } from '../lib/api';
+import { dayMonthDa } from '../lib/dates';
+import type { SuggestionSet } from '../lib/api.types';
+
+const hasError = Astro.url.searchParams.get('error') === '1';
+const api = await getApi();
+let set: SuggestionSet | null = null;
+let err = '';
+try {
+  set = await api.getSuggestions();
+} catch (e) {
+  err = e instanceof ApiError ? `Kunne ikke hente forslag (${e.status}).` : 'Kunne ikke nå tjenesten.';
+}
+---
+
+<Layout title="Forslag">
+  <h1>Forslag</h1>
+  {hasError && <p class="notice">Handlingen kunne ikke gennemføres. Prøv igen.</p>}
+  {err && <p class="notice">{err}</p>}
+  {set && (
+    <>
+      <div class="section-head">
+        <h2>Næste uge · {set.week_start}</h2>
+        <span class="tag">{set.quality === 'reviewed' ? '⭐ Gennemgået' : 'Hurtig'}</span>
+      </div>
+      <div class="row" style="gap:0.5rem; margin-bottom:0.8rem;">
+        <form method="post" action="/api/suggestions/accept">
+          <input type="hidden" name="all" value="1" />
+          <input type="hidden" name="week_start" value={set.week_start} />
+          <button class="btn-primary" type="submit">Accepter hele ugen</button>
+        </form>
+        <button id="recompute" class="btn-sm" type="button">Genberegn</button>
+        <span id="recompute-status" class="small muted"></span>
+      </div>
+      {set.suggestions.length === 0 && <p class="empty">Ingen forslag endnu. Tryk Genberegn.</p>}
+      <div class="cards">
+        {set.suggestions.map((s) => (
+          <div class="card">
+            <div class="row spread"><strong>{s.dish_name}</strong><span class="tag">{dayMonthDa(s.date)}</span></div>
+            <div class="small muted">{s.reason}</div>
+            <div class="small">Sikkerhed: {Math.round(s.confidence * 100)}%</div>
+            <form method="post" action="/api/suggestions/accept" style="margin-top:0.5rem;">
+              <input type="hidden" name="date" value={s.date} />
+              <input type="hidden" name="dish_id" value={s.dish_id} />
+              <button class="btn-sm" type="submit">Accepter</button>
+            </form>
+          </div>
+        ))}
+      </div>
+    </>
+  )}
+  <script is:inline define:vars={{ before: set?.updated_at ?? '' }}>
+    (function () {
+      var btn = document.getElementById('recompute');
+      var status = document.getElementById('recompute-status');
+      if (!btn) return;
+      btn.addEventListener('click', async function () {
+        btn.disabled = true;
+        status.textContent = 'Arbejder… (7b på CPU kan tage 1–2 min)';
+        try {
+          await fetch('/api/suggestions/refresh', { method: 'POST' });
+          var started = Date.now();
+          var timer = setInterval(async function () {
+            if (Date.now() - started > 180000) {
+              clearInterval(timer);
+              status.textContent = 'Tog for lang tid — genindlæs siden.';
+              btn.disabled = false;
+              return;
+            }
+            var r = await fetch('/api/suggestions/poll');
+            var j = await r.json();
+            if (j.updated_at && j.updated_at !== before) {
+              clearInterval(timer);
+              status.textContent = 'Færdig — genindlæser…';
+              location.reload();
+            }
+          }, 5000);
+        } catch (e) {
+          status.textContent = 'Kunne ikke starte genberegning.';
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</Layout>
