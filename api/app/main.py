@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 
 from . import config, db, dishes, suggest, suggestions, weekplan
 
@@ -30,6 +30,21 @@ app = FastAPI(title="nova-madplan", lifespan=lifespan)
 app.include_router(dishes.router)
 app.include_router(weekplan.router)
 app.include_router(suggestions.router)
+
+
+@app.post("/api/drain")
+async def drain(request: Request) -> dict:
+    """32b-agentens drain (§5). Bag MADPLAN_DRAIN_TOKEN (fail-closed).
+    Valgfri body {"ollama_url": ...} overstyrer STRONG_OLLAMA_URL."""
+    auth = request.headers.get("Authorization", "")
+    if not config.MADPLAN_DRAIN_TOKEN or auth != f"Bearer {config.MADPLAN_DRAIN_TOKEN}":
+        raise HTTPException(status_code=403)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    ollama_url = body.get("ollama_url") if isinstance(body, dict) else None
+    return await suggest.drain_once(ollama_url)
 
 
 @app.get("/healthz")

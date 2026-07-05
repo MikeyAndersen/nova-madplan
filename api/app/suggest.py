@@ -173,24 +173,28 @@ def _extract_suggestions(text: str) -> list[dict]:
 
 
 async def rank_with_llm(cands: list[dict], inv: list[dict], dates: list[str],
-                        today: date) -> list[dict]:
-    """Kald 7b. Returnerer rå forslag (uvaliderede). Kaster ved fejl —
-    kalderen falder tilbage til deterministisk rangering."""
+                        today: date, *, model: str | None = None,
+                        url: str | None = None) -> list[dict]:
+    """Kald Ollama (7b default, 32b i drain). Returnerer rå forslag
+    (uvaliderede). Kaster ved fejl — kalderen falder tilbage."""
     payload = {
-        "model": config.OLLAMA_MODEL,
+        "model": model or config.OLLAMA_MODEL,
         "prompt": _build_prompt(cands, inv, dates, today),
         "stream": False, "format": "json",
         "options": {"temperature": 0.4},
     }
+    base = (url or config.OLLAMA_URL).rstrip("/")
     async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.post(f"{config.OLLAMA_URL.rstrip('/')}/api/generate", json=payload)
+        r = await client.post(f"{base}/api/generate", json=payload)
         r.raise_for_status()
         return _extract_suggestions(r.json().get("response", ""))
 
 
 # ── Validering + genopfyldning + samling af sættet ──────────────────
 def assemble_set(week_start: date, pool: list[dict], inv: list[dict],
-                 dates: list[str], raw: list[dict], today: date) -> dict:
+                 dates: list[str], raw: list[dict], today: date, *,
+                 quality: str = "fast", generated_by: str | None = None,
+                 locked: dict[str, dict] | None = None) -> dict:
     by_id = {d["id"]: d for d in pool}
     chosen: dict[str, dict] = {}
     used: set[int] = set()
@@ -202,6 +206,11 @@ def assemble_set(week_start: date, pool: list[dict], inv: list[dict],
             "confidence": conf if conf is not None else _confidence(dish, inv, today),
         }
         used.add(dish["id"])
+
+    # 0) Menneske-vinder (§5.3): allerede planned/cooked dage låses, uændret.
+    for dt, dish in (locked or {}).items():
+        if dt in dates:
+            place(dt, dish, "allerede planlagt", 1.0)
 
     # 1) LLM-forslag: kun gyldige dish_id fra kandidatlisten, unikke datoer/retter.
     for s in raw:
@@ -235,8 +244,8 @@ def assemble_set(week_start: date, pool: list[dict], inv: list[dict],
 
     return {
         "week_start": week_start.isoformat(),
-        "generated_by": config.OLLAMA_MODEL,
-        "quality": "fast",
+        "generated_by": generated_by or config.OLLAMA_MODEL,
+        "quality": quality,
         "inventory_hash": inventory.hash_inventory(inv),
         "suggestions": [chosen[dt] for dt in dates if dt in chosen],
         "updated_at": _now_iso(),
@@ -252,19 +261,100 @@ def latest_set(conn, week_start: str) -> dict | None:
     return json.loads(row["payload_json"]) if row else None
 
 
-def save_set(conn, s: dict) -> None:
-    payload = json.dumps(s, ensure_ascii=False)
+def _insert_set(conn, s: dict) -> None:
     conn.execute(
         "INSERT INTO suggestion_sets(week_start, payload_json, quality, inventory_hash,"
         " generated_by, updated_at) VALUES(?,?,?,?,?,?)",
-        (s["week_start"], payload, s["quality"], s["inventory_hash"],
-         s["generated_by"], s["updated_at"]),
+        (s["week_start"], json.dumps(s, ensure_ascii=False), s["quality"],
+         s["inventory_hash"], s["generated_by"], s["updated_at"]),
     )
-    # Kø til 32b (Fase 5): idempotent pr. uge — nyeste pending vinder (§5).
+
+
+def save_set(conn, s: dict) -> None:
+    """Fast (7b) sæt: gem + læg i kø til 32b — idempotent pr. uge (§5)."""
+    _insert_set(conn, s)
     conn.execute("UPDATE suggest_queue SET status='expired'"
                  " WHERE week_start = ? AND status='pending'", (s["week_start"],))
     conn.execute("INSERT INTO suggest_queue(week_start, payload_json, status, created_at)"
-                 " VALUES(?,?, 'pending', ?)", (s["week_start"], payload, _now_iso()))
+                 " VALUES(?,?, 'pending', ?)",
+                 (s["week_start"], json.dumps(s, ensure_ascii=False), _now_iso()))
+
+
+def save_reviewed(conn, s: dict, queue_id: int) -> None:
+    """Reviewed (32b) sæt: gem + luk kø-posten. Re-enqueuer IKKE."""
+    _insert_set(conn, s)
+    conn.execute("UPDATE suggest_queue SET status='done', done_at=? WHERE id=?",
+                 (_now_iso(), queue_id))
+
+
+# ── 32b kvalitets-pass (drain, §5) ──────────────────────────────────
+def expire_stale_queue(conn) -> None:
+    cutoff = (datetime.now(_tz()) - timedelta(days=config.SUGGEST_QUEUE_MAX_DAYS)
+              ).isoformat(timespec="seconds")
+    conn.execute("UPDATE suggest_queue SET status='expired'"
+                 " WHERE status='pending' AND created_at < ?", (cutoff,))
+    # Nyeste pending pr. uge vinder; ældre markeres expired.
+    conn.execute("UPDATE suggest_queue SET status='expired' WHERE status='pending'"
+                 " AND id NOT IN (SELECT MAX(id) FROM suggest_queue"
+                 " WHERE status='pending' GROUP BY week_start)")
+
+
+def _locked_days(conn, dates: list[str]) -> dict[str, dict]:
+    """Dage der allerede er planned/cooked i ugeplanen — menneske-vinder (§5.3)."""
+    placeholders = ",".join("?" * len(dates))
+    rows = conn.execute(
+        f"SELECT wd.date, wd.dish_id, di.name FROM weekplan_days wd"
+        f" JOIN dishes di ON di.id = wd.dish_id"
+        f" WHERE wd.date IN ({placeholders}) AND wd.status IN ('planned','cooked')",
+        dates,
+    ).fetchall()
+    return {r["date"]: {"id": r["dish_id"], "name": r["name"]} for r in rows}
+
+
+def _pending_count(conn) -> int:
+    return conn.execute("SELECT COUNT(*) FROM suggest_queue WHERE status='pending'").fetchone()[0]
+
+
+async def drain_once(ollama_url: str | None = None) -> dict:
+    """Ét 32b-pass: opgradér ældste pending sæt til quality=reviewed.
+    PC uden for rækkevidde ⇒ online:false, kø-posten forbliver pending, og
+    7b-sættet er allerede live (§5). Svarform matcher agentens forventninger."""
+    url = ollama_url or config.STRONG_OLLAMA_URL
+    today = _today()
+    with db.connect() as conn:
+        if not url:
+            return {"processed": 0, "online": False, "remaining": _pending_count(conn)}
+        expire_stale_queue(conn)
+        row = conn.execute(
+            "SELECT id, week_start FROM suggest_queue WHERE status='pending'"
+            " ORDER BY created_at ASC, id ASC LIMIT 1").fetchone()
+        if row is None:
+            return {"processed": 0, "remaining": 0, "online": True}
+        queue_id, week_start = row["id"], date.fromisoformat(row["week_start"])
+        dishes = load_active_dishes(conn)
+        dates = [(week_start + timedelta(days=i)).isoformat() for i in range(7)]
+        locked = _locked_days(conn, dates)
+
+    pool = candidate_pool(dishes, today)
+    try:
+        inv = await inventory.fetch()
+    except Exception:
+        inv = []
+    free_dates = [d for d in dates if d not in locked]
+    try:
+        raw = await rank_with_llm(pool, inv, free_dates, today,
+                                  model=config.STRONG_OLLAMA_MODEL, url=url)
+    except Exception:
+        log.exception("32b-drain: strong model unreachable — kø-post forbliver pending")
+        with db.connect() as conn:
+            return {"processed": 0, "online": False, "remaining": _pending_count(conn)}
+
+    s = assemble_set(week_start, pool, inv, dates, raw, today, quality="reviewed",
+                     generated_by=config.STRONG_OLLAMA_MODEL, locked=locked)
+    with db.connect() as conn:
+        save_reviewed(conn, s, queue_id)
+        remaining = _pending_count(conn)
+    return {"processed": 1, "week_start": s["week_start"], "remaining": remaining, "online": True}
 
 
 # ── Orkestrering ────────────────────────────────────────────────────
