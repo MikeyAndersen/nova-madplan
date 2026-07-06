@@ -1,6 +1,7 @@
 ---
 import Layout from '../../components/Layout.astro';
 import MealCard from '../../components/MealCard.astro';
+import QuickfillPanel from '../../components/QuickfillPanel.astro';
 import { getApi, ApiError } from '../../lib/api';
 import { mondayOf, addDaysISO, dayMonthDa } from '../../lib/dates';
 import type { WeekPlan, Dish } from '../../lib/api.types';
@@ -32,6 +33,7 @@ const range = `${dayMonthDa(ws)} – ${dayMonthDa(addDaysISO(ws, 6))}`;
     <h2>{range}</h2>
     <a class="count-pill" href={`/madplan?start=${next}`}>Næste ›</a>
   </div>
+  {plan && <QuickfillPanel weekStart={ws} dishes={dishes} />}
   {plan && (
     <div class="cards">
       {plan.days.map((d) => <MealCard day={d} dishes={dishes} weekStart={ws} />)}
