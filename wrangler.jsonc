@@ -11,12 +11,16 @@
 		"directory": "./dist",
 		"binding": "ASSETS"
 	},
+	"kv_namespaces": [
+		{ "binding": "SESSION", "id": "706dee54f9cf452e8504fe29d7726ef0" }
+	],
 	"observability": {
 		"enabled": true
 	},
+	// Prod-defaults. MADPLAN_API_BASE er ikke-hemmelig og bor her.
+	// LIFEHUB_API_TOKEN + SITE_PASSWORD sættes som secrets (wrangler secret put).
+	// Lokal dev overstyrer alle tre via .dev.vars (gitignoreret).
 	"vars": {
-		"MADPLAN_API_BASE": "http://localhost:8400",
-		"LIFEHUB_API_TOKEN": "dev",
-		"SITE_PASSWORD": "dev"
+		"MADPLAN_API_BASE": "https://madplan-api.nova-tech.dk"
 	}
 }

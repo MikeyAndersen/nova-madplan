@@ -1,6 +1,7 @@
 # environment variables
 .env
 .env.production
+.dev.vars
 
 # FastAPI-stack: runtime-data, migrering, python
 data/
