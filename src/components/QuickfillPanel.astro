@@ -35,22 +35,28 @@ const { weekStart, dishes } = Astro.props;
       return o ? Number(o.getAttribute('data-id')) : null;
     }
 
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
     function rowHtml(p) {
-      var head = '<strong>' + p.date + '</strong> ';
-      if (p.kind === 'match') return head + '→ ' + p.matchedDishName + ' <span class="tag">match</span>';
-      if (p.kind === 'cooked') return head + '🔒 ' + (p.currentDishName || 'tilberedt') + ' <span class="tag">låst</span>';
-      if (p.kind === 'keep') return head + (p.currentDishName || '') + ' <span class="tag">beholdes</span>';
+      var head = '<strong>' + esc(p.date) + '</strong> ';
+      if (p.kind === 'match') return head + '→ ' + esc(p.matchedDishName) + ' <span class="tag">match</span>';
+      if (p.kind === 'cooked') return head + '🔒 ' + esc(p.currentDishName || 'tilberedt') + ' <span class="tag">låst</span>';
+      if (p.kind === 'keep') return head + esc(p.currentDishName || '') + ' <span class="tag">beholdes</span>';
       if (p.kind === 'empty') return head + '<span class="muted">tom — fyldes evt. af +AI</span>';
       if (p.kind === 'new') {
         var n = 'nk-' + p.weekday;
-        return head + '“' + p.parsedTitle + '” <span class="tag">ny</span><div class="small" style="margin-top:.3rem">'
+        return head + '“' + esc(p.parsedTitle) + '” <span class="tag">ny</span><div class="small" style="margin-top:.3rem">'
           + '<label><input type="radio" name="' + n + '" value="create" checked> Opret som ret</label> '
           + '<label><input type="radio" name="' + n + '" value="note"> Note</label> '
           + '<label><input type="radio" name="' + n + '" value="existing"> Vælg: '
           + '<input class="dish-input" list="qf-dishes" data-existing placeholder="ret…"></label></div>';
       }
       // conflict
-      return head + 'nu: ' + (p.currentDishName || '?') + ' → “' + p.parsedTitle + '” <span class="tag">konflikt</span> '
+      return head + 'nu: ' + esc(p.currentDishName || '?') + ' → “' + esc(p.parsedTitle) + '” <span class="tag">konflikt</span> '
         + '<label class="small"><input type="checkbox" data-overwrite> overskriv</label>';
     }
 
@@ -111,6 +117,7 @@ const { weekStart, dishes } = Astro.props;
           body: JSON.stringify({ decisions: decisions }),
         });
         var j = await r.json();
+        if (!r.ok || !j.results) throw new Error('apply');
         var failed = (j.results || []).filter(function (x) { return !x.ok; });
         if (failed.length) { status.textContent = 'Nogle dage fejlede: ' + failed.map(function (x){return x.date;}).join(', '); return; }
         location.href = '/madplan?start=' + encodeURIComponent(weekStart);
