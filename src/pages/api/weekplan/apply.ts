@@ -4,10 +4,19 @@ import type { ApplyDecision, ApplyResult } from '../../../lib/weekplan-preview';
 
 export const POST: APIRoute = async ({ request }) => {
 	const api = await getApi();
-	const body = (await request.json().catch(() => ({}))) as { decisions?: ApplyDecision[] };
+	const body = (await request.json().catch(() => ({}))) as { weekStart?: string; decisions?: ApplyDecision[] };
+	let cooked = new Set<string>();
+	try {
+		const week = body.weekStart ? await api.getWeekplan(body.weekStart) : await api.getCurrentWeekplan();
+		cooked = new Set(week.days.filter((d) => d.status === 'cooked').map((d) => d.date));
+	} catch { /* uden uge-data springer vi cooked-låsen over (best-effort) */ }
 	const results: ApplyResult[] = [];
 	for (const d of body.decisions ?? []) {
 		if (d.action === 'skip') {
+			results.push({ date: d.date, ok: true });
+			continue;
+		}
+		if (cooked.has(d.date)) {
 			results.push({ date: d.date, ok: true });
 			continue;
 		}

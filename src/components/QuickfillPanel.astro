@@ -30,8 +30,10 @@ const { weekStart, dishes } = Astro.props;
     var dl = document.getElementById('qf-dishes');
     var current = [];
 
+    function norm(s) { return String(s || '').trim().toLowerCase().replace(/ø/g, 'o').replace(/å/g, 'a').replace(/æ/g, 'ae').replace(/\s+/g, ' '); }
+
     function idForName(name) {
-      var o = Array.prototype.find.call(dl.options, function (x) { return x.value === name; });
+      var o = Array.prototype.find.call(dl.options, function (x) { return norm(x.value) === norm(name); });
       return o ? Number(o.getAttribute('data-id')) : null;
     }
 
@@ -114,7 +116,7 @@ const { weekStart, dishes } = Astro.props;
       try {
         var r = await fetch('/api/weekplan/apply', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ decisions: decisions }),
+          body: JSON.stringify({ weekStart: weekStart, decisions: decisions }),
         });
         var j = await r.json();
         if (!r.ok || !j.results) throw new Error('apply');
@@ -127,6 +129,9 @@ const { weekStart, dishes } = Astro.props;
     });
 
     document.getElementById('qf-ai').addEventListener('click', async function () {
+      var btn = document.getElementById('qf-ai');
+      if (btn.disabled) return;
+      btn.disabled = true;
       var aiStatus = document.getElementById('qf-ai-status');
       aiStatus.textContent = 'Arbejder… (7b på CPU kan tage 1–2 min)';
       try {
@@ -135,12 +140,13 @@ const { weekStart, dishes } = Astro.props;
         await fetch('/api/suggestions/refresh', { method: 'POST' });
         var started = Date.now();
         var timer = setInterval(async function () {
-          if (Date.now() - started > 180000) { clearInterval(timer); aiStatus.textContent = 'Tog for lang tid — åbn Forslag manuelt.'; return; }
+          if (Date.now() - started > 180000) { clearInterval(timer); aiStatus.textContent = 'Tog for lang tid — åbn Forslag manuelt.'; btn.disabled = false; return; }
           var r = await fetch('/api/suggestions/poll'); var j = await r.json();
           if (j.updated_at && j.updated_at !== before) { clearInterval(timer); location.href = '/forslag'; }
         }, 5000);
       } catch (e) {
         aiStatus.textContent = 'Kunne ikke starte. Åbn Forslag manuelt.';
+        btn.disabled = false;
       }
     });
   })();
