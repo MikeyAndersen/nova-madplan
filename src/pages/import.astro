@@ -1,0 +1,130 @@
+---
+import Layout from '../components/Layout.astro';
+import { parseNemlig } from '../lib/nemlig/parser';
+import { defaultLocationForCategory, LOCATIONS, LOCATION_LABELS } from '../lib/locations';
+import type { ParseResult } from '../lib/nemlig/types';
+
+let parsed: ParseResult | null = null;
+let rawText = '';
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  rawText = String(data.get('raw') ?? '');
+  if (rawText.trim()) parsed = parseNemlig(rawText);
+}
+
+// Kvittering efter indsættelse (query-params fra /api/import).
+const p = Astro.url.searchParams;
+const hasError = p.get('error') === '1';
+const receipt = p.has('added')
+  ? {
+      added: Number(p.get('added') ?? 0),
+      merged: Number(p.get('merged') ?? 0),
+      skipped: Number(p.get('skipped') ?? 0),
+    }
+  : null;
+---
+
+<Layout title="Import">
+  <h1>Import fra nemlig</h1>
+  <p class="muted small">Indsæt en ordre — også tekst kopieret fra en faktura-PDF. Du bekræfter alt før noget gemmes.</p>
+
+  {hasError && <p class="notice">Kunne ikke gemme varerne. Prøv igen.</p>}
+
+  {receipt && (
+    <div class="notice">
+      ✅ Tilføjede {receipt.added} {receipt.added === 1 ? 'ny vare' : 'nye varer'}
+      {receipt.merged > 0 && <> · lagde {receipt.merged} til eksisterende</>}
+      {receipt.skipped > 0 && <> · sprang {receipt.skipped} {receipt.skipped === 1 ? 'linje' : 'linjer'} over</>}.
+      <div style="margin-top:0.5rem;"><a class="btn btn-sm" href="/beholdning">Se beholdning →</a></div>
+    </div>
+  )}
+
+  {!parsed && (
+    <form method="post" action="/import">
+      <div class="field">
+        <textarea name="raw" rows="12" placeholder="Indsæt nemlig-ordre her…">{rawText}</textarea>
+      </div>
+      <button class="btn-primary btn-block" type="submit">Analysér</button>
+    </form>
+  )}
+
+  {parsed && (
+    <>
+      <div class="row spread" style="margin-bottom:0.5rem;">
+        <strong>{parsed.items.length} {parsed.items.length === 1 ? 'vare fundet' : 'varer fundet'}</strong>
+        <a class="btn btn-sm" href="/import">Start forfra</a>
+      </div>
+
+      <form method="post" action="/api/import">
+        <div class="cards" style="grid-template-columns:1fr;">
+          {parsed.items.map((it, i) => {
+            const loc = defaultLocationForCategory(it.category);
+            return (
+              <div class="card">
+                <label class="row" style="gap:0.5rem; font-weight:700; margin-bottom:0.5rem;">
+                  <input type="checkbox" name="include" value={i} checked style="width:auto;" />
+                  Inkludér
+                </label>
+                <input type="hidden" name={`name_${i}`} value={it.name} />
+                <div class="field">
+                  <label>Vare</label>
+                  <input value={it.name} disabled />
+                </div>
+                <div class="grid-2">
+                  <div class="field">
+                    <label>Antal</label>
+                    <input name={`quantity_${i}`} type="number" min="1" step="1" value={it.quantity} />
+                  </div>
+                  <div class="field">
+                    <label>Enhed</label>
+                    <input name={`unit_${i}`} value={it.unit} />
+                  </div>
+                </div>
+                <div class="grid-2">
+                  <div class="field">
+                    <label>Lokation</label>
+                    <select name={`location_${i}`}>
+                      {LOCATIONS.map((l) => (
+                        <option value={l} selected={l === loc}>{LOCATION_LABELS[l]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <label class="row" style="gap:0.4rem; align-items:end; padding-bottom:0.7rem;">
+                    <input type="checkbox" name={`merge_${i}`} value="1" checked style="width:auto;" />
+                    <span class="small">Læg til eksisterende</span>
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <input type="hidden" name="item_count" value={parsed.items.length} />
+        <button class="btn-primary btn-block" type="submit" style="margin-top:1rem;">
+          Tilføj valgte varer til beholdning
+        </button>
+      </form>
+
+      {parsed.recipes.length > 0 && (
+        <>
+          <h2>Opskrifter</h2>
+          <p class="muted small">Fundet i ordren — opret dem evt. som retter under Retter.</p>
+          {parsed.recipes.map((r) => (
+            <div class="card" style="margin-bottom:0.6rem;">
+              <strong>{r.name} <span class="tag">{r.persons} pers.</span></strong>
+            </div>
+          ))}
+        </>
+      )}
+
+      {parsed.unreadable.length > 0 && (
+        <>
+          <h2>Kunne ikke læses</h2>
+          <p class="muted small">Disse linjer blev sprunget over — tilføj dem evt. manuelt.</p>
+          <pre class="card small" style="white-space:pre-wrap; overflow-x:auto;">{parsed.unreadable.join('\n')}</pre>
+        </>
+      )}
+    </>
+  )}
+</Layout>
