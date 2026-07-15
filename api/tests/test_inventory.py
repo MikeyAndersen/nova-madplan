@@ -2,6 +2,9 @@
 
 NB: test-DB'en deles på tværs af tests — brug unikke navne + ?q=-filtre,
 antag aldrig tom tabel."""
+import asyncio
+
+from app import inventory
 from conftest import AUTH
 
 
@@ -67,3 +70,21 @@ def test_filter_category(client):
     ]}, headers=AUTH)
     frys = client.get("/api/inventory?q=testærter&category=fryser", headers=AUTH).json()
     assert [i["name"] for i in frys] == ["Testærter frost"]
+
+
+def test_fetch_reads_local_table_and_hash_gates(client):
+    client.post("/api/inventory", json={"items": [{"name": "Testhakket oksekød",
+                                                   "category": "fryser"}]}, headers=AUTH)
+    inv = asyncio.run(inventory.fetch())
+    mine = [i for i in inv if i["name"] == "Testhakket oksekød"]
+    assert len(mine) == 1
+    assert mine[0]["bucket"] == "recently_done"  # fuld vægt i scoring (§4.2)
+    assert mine[0]["category"] == "fryser"
+
+    h1 = inventory.hash_inventory(inv)
+    assert h1.startswith("sha256:")
+    # Beholdnings-ændring → nyt hash → recompute-gate åbner (§4.4-4)
+    client.post("/api/inventory", json={"items": [{"name": "Testløg", "category": "skab"}]},
+                headers=AUTH)
+    h2 = inventory.hash_inventory(asyncio.run(inventory.fetch()))
+    assert h1 != h2

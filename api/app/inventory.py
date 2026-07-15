@@ -1,7 +1,9 @@
-"""Lager fra brain (§2.3) + stabilt hash til recompute-gating (§4.1).
+"""Madplan-ejet beholdning (Feature B, §4.1): CRUD-API + lager-feed til
+forslags-motoren.
 
-Madplan taler ALDRIG direkte med Vikunja (§A4) — kun med brains
-/api/internal/inventory. Tomt INTERNAL_API_TOKEN ⇒ tomt lager (feed slået fra).
+Kilden var før brains /api/internal/inventory (Vikunja) — nu ejer madplan selv
+tabellen `inventory_items`. suggest.py er urørt: kun fetch() har skiftet kilde,
+og hash_inventory() er stadig recompute-gaten (§4.1).
 """
 import hashlib
 import json
@@ -9,7 +11,6 @@ import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from . import config, db
@@ -107,23 +108,20 @@ def delete_item(item_id: int) -> Response:
 
 
 async def fetch() -> list[dict]:
-    if not config.INTERNAL_API_TOKEN:
-        return []
-    url = f"{config.BRAIN_URL.rstrip('/')}/api/internal/inventory"
-    headers = {"Authorization": f"Bearer {config.INTERNAL_API_TOKEN}"}
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.get(url, headers=headers)
-        r.raise_for_status()
-        return r.json() or []
+    """Lager til forslags-motoren — læser madplans egen tabel.
+    `bucket: recently_done` giver fuld vægt i scoring: alt i beholdningen er
+    på lager. Async-signaturen beholdes så suggest.py er urørt."""
+    with db.connect() as conn:
+        rows = conn.execute("SELECT id, name, quantity, unit, note, category, source"
+                            " FROM inventory_items").fetchall()
+    return [{**dict(r), "bucket": "recently_done"} for r in rows]
 
 
 def hash_inventory(items: list[dict]) -> str:
-    """sha256 over de felter der påvirker forslag (navn+bucket+done pr. task).
-    Uændret hash ⇒ ingen grund til at genberegne (§4.1)."""
-    canon = sorted(
-        [str(i.get("vikunja_task_id")), (i.get("name") or ""),
-         (i.get("bucket") or ""), str(bool(i.get("done")))]
-        for i in items
-    )
+    """sha256 over kanonisk JSON pr. række — form-agnostisk, så både gamle
+    (vikunja-formede) og nye rækker hasher stabilt. Uændret hash ⇒ ingen
+    recompute (§4.1)."""
+    canon = sorted(json.dumps(i, ensure_ascii=False, sort_keys=True, default=str)
+                   for i in items)
     digest = hashlib.sha256(json.dumps(canon, ensure_ascii=False).encode("utf-8")).hexdigest()
     return f"sha256:{digest[:16]}"
