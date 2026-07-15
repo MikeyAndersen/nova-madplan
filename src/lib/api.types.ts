@@ -55,3 +55,25 @@ export interface SuggestionSet {
 	suggestions: Suggestion[];
 	updated_at: string;
 }
+
+export interface InventoryItem {
+	id: number;
+	name: string;
+	name_key: string;
+	quantity: number;
+	unit: string | null;
+	note: string | null;
+	category: string | null;
+	source: string;
+	added_at: string;
+	updated_at: string;
+}
+
+export interface InventoryItemInput {
+	name: string;
+	quantity?: number;
+	unit?: string | null;
+	note?: string | null;
+	category?: string | null;
+	source?: string;
+}

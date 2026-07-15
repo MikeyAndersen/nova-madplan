@@ -1,4 +1,4 @@
-import type { WeekPlan, Dish, DishInput, SuggestionSet, DayStatus } from './api.types';
+import type { WeekPlan, Dish, DishInput, SuggestionSet, DayStatus, InventoryItem, InventoryItemInput } from './api.types';
 export type * from './api.types';
 
 export class ApiError extends Error {
@@ -49,6 +49,21 @@ export function makeApi(base: string, token: string, fetchImpl: typeof fetch = f
 		refreshSuggestions: () => call<void>('/api/suggestions/refresh', { method: 'POST' }),
 		acceptSuggestion: (date: string, dish_id: number) =>
 			call<WeekPlan>('/api/suggestions/accept', { method: 'POST', body: JSON.stringify({ date, dish_id }) }),
+		listInventory: (filter: { q?: string; category?: string } = {}) => {
+			const p = new URLSearchParams();
+			if (filter.q) p.set('q', filter.q);
+			if (filter.category) p.set('category', filter.category);
+			const qs = p.toString();
+			return call<InventoryItem[]>(`/api/inventory${qs ? `?${qs}` : ''}`);
+		},
+		bulkAddInventory: (items: InventoryItemInput[], merge = true) =>
+			call<{ added: number; merged: number }>('/api/inventory', {
+				method: 'POST',
+				body: JSON.stringify({ items, merge }),
+			}),
+		updateInventoryItem: (id: number, patch: Partial<InventoryItemInput>) =>
+			call<InventoryItem>(`/api/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+		deleteInventoryItem: (id: number) => call<void>(`/api/inventory/${id}`, { method: 'DELETE' }),
 	};
 }
 
