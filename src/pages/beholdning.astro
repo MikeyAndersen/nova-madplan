@@ -1,0 +1,102 @@
+---
+import Layout from '../components/Layout.astro';
+import ItemCard from '../components/ItemCard.astro';
+import { getApi, ApiError } from '../lib/api';
+import { LOCATIONS, LOCATION_LABELS, isLocation, type Location } from '../lib/locations';
+import type { InventoryItem } from '../lib/api.types';
+
+const url = Astro.url;
+const q = url.searchParams.get('q')?.trim() ?? '';
+const locParam = url.searchParams.get('location')?.trim() ?? '';
+const locFilter = isLocation(locParam) ? locParam : undefined;
+const hasError = url.searchParams.get('error') === '1';
+
+const api = await getApi();
+let items: InventoryItem[] = [];
+let loadError = '';
+try {
+  items = await api.listInventory({ q: q || undefined, category: locFilter });
+} catch (e) {
+  loadError = e instanceof ApiError ? `Kunne ikke hente beholdningen (${e.status}).` : 'Kunne ikke nå tjenesten.';
+}
+
+// Gruppér på lokation; ukendt/tom kategori lander i Øvrigt.
+const byLoc = Object.fromEntries(LOCATIONS.map((l) => [l, []])) as Record<Location, InventoryItem[]>;
+for (const it of items) byLoc[isLocation(it.category ?? '') ? (it.category as Location) : 'ovrigt'].push(it);
+
+const sections = locFilter ? [locFilter] : LOCATIONS;
+const filtering = Boolean(q || locFilter);
+---
+
+<Layout title="Beholdning">
+  <h1>Beholdning</h1>
+  <p class="muted small">Hvad har vi hjemme?</p>
+  {hasError && <p class="notice">Handlingen kunne ikke gennemføres. Prøv igen.</p>}
+  {loadError && <p class="notice">{loadError}</p>}
+
+  <div class="row spread" style="margin-bottom:0.8rem;">
+    <a class="btn btn-sm" href="/import">Importér fra nemlig →</a>
+  </div>
+
+  <form class="toolbar" method="get">
+    <input type="search" name="q" value={q} placeholder="Søg vare…" aria-label="Søg" />
+    <select name="location" aria-label="Lokation">
+      <option value="">Alle lokationer</option>
+      {LOCATIONS.map((l) => (
+        <option value={l} selected={l === locFilter}>{LOCATION_LABELS[l]}</option>
+      ))}
+    </select>
+    <button class="btn-primary" type="submit">Søg</button>
+    {filtering && <a class="btn" href="/beholdning">Nulstil</a>}
+  </form>
+
+  <details class="editor" style="margin-bottom:1rem;">
+    <summary class="btn btn-primary btn-block" style="text-align:center;">+ Tilføj vare manuelt</summary>
+    <form method="post" action="/api/inventory" class="card" style="margin-top:0.6rem;">
+      <input type="hidden" name="action" value="add" />
+      <div class="field">
+        <label>Navn</label>
+        <input name="name" required placeholder="fx Smør" />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Lokation</label>
+          <select name="category">
+            {LOCATIONS.map((l) => <option value={l}>{LOCATION_LABELS[l]}</option>)}
+          </select>
+        </div>
+        <div class="field">
+          <label>Antal</label>
+          <input name="quantity" type="number" min="0" step="1" value="1" />
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Enhed (valgfri)</label>
+          <input name="unit" placeholder="fx 250 g" />
+        </div>
+        <div class="field">
+          <label>Note (valgfri)</label>
+          <input name="note" placeholder="fx saltet" />
+        </div>
+      </div>
+      <button class="btn-primary btn-block" type="submit">Tilføj vare</button>
+    </form>
+  </details>
+
+  {!loadError && sections.map((loc) => (
+    <section>
+      <div class="section-head">
+        <h2>{LOCATION_LABELS[loc]}</h2>
+        <span class="count-pill">{byLoc[loc].length} {byLoc[loc].length === 1 ? 'vare' : 'varer'}</span>
+      </div>
+      {byLoc[loc].length === 0 ? (
+        <p class="empty">{filtering ? 'Ingen varer matcher.' : 'Tom.'}</p>
+      ) : (
+        <div class="cards">
+          {byLoc[loc].map((it) => <ItemCard item={it} />)}
+        </div>
+      )}
+    </section>
+  ))}
+</Layout>

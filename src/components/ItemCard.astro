@@ -1,0 +1,76 @@
+---
+import type { InventoryItem } from '../lib/api.types';
+import { LOCATIONS, LOCATION_LABELS, isLocation } from '../lib/locations';
+
+interface Props {
+  item: InventoryItem;
+}
+const { item } = Astro.props;
+const qty = Number.isInteger(item.quantity) ? item.quantity : Number(item.quantity.toFixed(2));
+const itemLoc = isLocation(item.category ?? '') ? item.category : 'ovrigt';
+---
+
+<div class="card">
+  <div class="row spread">
+    <h3>{item.name}</h3>
+    <span class="qty">{qty}</span>
+  </div>
+
+  <div class="row wrap" style="gap:0.4rem; margin:0.35rem 0 0.6rem;">
+    {item.unit && <span class="tag">{item.unit}</span>}
+    {item.source === 'nemlig' && <span class="tag">nemlig</span>}
+    {item.note && <span class="small muted">{item.note}</span>}
+  </div>
+
+  <div class="row" style="gap:0.4rem;">
+    <form method="post" action="/api/inventory">
+      <input type="hidden" name="action" value="consume" />
+      <input type="hidden" name="id" value={item.id} />
+      <input type="hidden" name="quantity" value={qty} />
+      <button class="btn-sm" type="submit" title="Forbrug 1">− Forbrug</button>
+    </form>
+
+    <form method="post" action="/api/inventory" onsubmit="return confirm('Slet varen?')">
+      <input type="hidden" name="action" value="delete" />
+      <input type="hidden" name="id" value={item.id} />
+      <button class="btn-sm btn-danger" type="submit" title="Slet">Slet</button>
+    </form>
+  </div>
+
+  <details class="editor" style="margin-top:0.5rem;">
+    <summary class="small">Redigér</summary>
+    <form method="post" action="/api/inventory" style="margin-top:0.6rem;">
+      <input type="hidden" name="action" value="update" />
+      <input type="hidden" name="id" value={item.id} />
+      <div class="field">
+        <label>Navn</label>
+        <input name="name" value={item.name} required />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Lokation</label>
+          <select name="category">
+            {LOCATIONS.map((l) => (
+              <option value={l} selected={l === itemLoc}>{LOCATION_LABELS[l]}</option>
+            ))}
+          </select>
+        </div>
+        <div class="field">
+          <label>Antal</label>
+          <input name="quantity" type="number" min="0" step="1" value={qty} />
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Enhed</label>
+          <input name="unit" value={item.unit ?? ''} placeholder="fx 500 g" />
+        </div>
+        <div class="field">
+          <label>Note</label>
+          <input name="note" value={item.note ?? ''} placeholder="fx saltet" />
+        </div>
+      </div>
+      <button class="btn-primary btn-block" type="submit">Gem ændringer</button>
+    </form>
+  </details>
+</div>
