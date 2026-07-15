@@ -19,9 +19,11 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 		if (action === 'add') {
 			if (!s(data, 'name')) return redirect(back);
 			const category = s(data, 'category');
+			const qtyRaw = s(data, 'quantity');
+			const quantity = qtyRaw === '' || Number.isNaN(Number(qtyRaw)) ? 1 : Number(qtyRaw);
 			await api.bulkAddInventory([{
 				name: s(data, 'name'),
-				quantity: Number(s(data, 'quantity')) || 1,
+				quantity,
 				unit: nullable(data, 'unit'),
 				note: nullable(data, 'note'),
 				category: isLocation(category) ? category : null,
