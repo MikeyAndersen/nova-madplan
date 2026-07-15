@@ -174,3 +174,23 @@ Den gamle D1-database + binding dekommissioneres **først** når kriterierne i
 spec §3.5 er verificeret på det deployede site: login virker, ugeplanen kan
 redigeres, forslag kan accepteres (enkeltdag + hel uge), fejlbanner vises når
 backenden er nede, og tokenet optræder ikke i klient-bundlet.
+
+## Feature B — Beholdning (madplan-ejet)
+
+Ingen ny infrastruktur. Rækkefølge på LXC 103:
+
+1. **madplan-api:** `cd /opt/nova-madplan && git pull && docker compose down && docker compose up -d --build`
+   (`inventory_items`-tabellen oprettes automatisk ved opstart). NB: madplans
+   forslags-motor bruger ikke længere brains `/api/internal/inventory` —
+   `INTERNAL_API_TOKEN` i madplans `.env` er nu ubrugt (kan blive stående).
+2. **Frontend:** `npm ci && npm run build && npx wrangler deploy` (fra repo-roden
+   på PC'en). Nyt menupunkt "Beholdning" + `/import`.
+3. **brain:** `cd /opt/lifehub && git pull && docker compose down && docker compose up -d --build`
+   (beholdnings-poll + dashboard-blok).
+4. **Dashboard-PWA:** `cd /opt/lifehub/dashboard && npm ci && npm run build` og
+   genudgiv `dist/` som hidtil.
+
+Verifikation (§4.4): paste en nemlig-ordre → varer i beholdningen; tryk
+Genberegn under Forslag → `inventory_hash` i svaret fra
+`GET /api/suggestions/current` har skiftet; dashboard-kortet "Beholdning"
+dukker op; stop madplan-api → kortet viser "gemt kopi".
