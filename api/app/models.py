@@ -81,3 +81,33 @@ class SuggestionSet(BaseModel):
 class AcceptBody(BaseModel):
     date: str  # YYYY-MM-DD
     dish_id: int
+
+
+# ── Beholdning (Feature B, spec §4.1) ───────────────────────────────
+class InventoryItemIn(BaseModel):
+    name: str = Field(min_length=1)
+    quantity: float = 1
+    unit: str | None = None
+    note: str | None = None
+    category: str | None = None   # frontendens lokations-slug (koleskab|fryser|skab|ovrigt)
+    source: str = "manuel"        # nemlig | manuel
+
+
+class InventoryBulkIn(BaseModel):
+    items: list[InventoryItemIn]
+    merge: bool = True            # merge-på-navn: læg quantity til eksisterende (§8)
+
+
+class InventoryPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    quantity: float | None = None
+    unit: str | None = None
+    note: str | None = None
+    category: str | None = None
+
+
+class InventoryItem(InventoryItemIn):
+    id: int
+    name_key: str
+    added_at: str
+    updated_at: str

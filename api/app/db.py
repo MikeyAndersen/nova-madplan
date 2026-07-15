@@ -55,9 +55,25 @@ CREATE TABLE IF NOT EXISTS suggestion_sets (
     updated_at TEXT NOT NULL
 );
 
+-- Feature B: madplan-ejet beholdning (§4.1). category = frontendens
+-- lokations-slug (koleskab|fryser|skab|ovrigt), nullable.
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL,                   -- normaliseret navn til merge-på-navn
+    quantity REAL NOT NULL DEFAULT 1,
+    unit TEXT,
+    note TEXT,
+    category TEXT,
+    source TEXT NOT NULL DEFAULT 'manuel',    -- nemlig | manuel
+    added_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_history_dish ON history(dish_id);
 CREATE INDEX IF NOT EXISTS idx_suggest_queue_week ON suggest_queue(week_start, status);
 CREATE INDEX IF NOT EXISTS idx_suggestion_sets_week ON suggestion_sets(week_start);
+CREATE INDEX IF NOT EXISTS idx_inventory_name_key ON inventory_items(name_key);
 """
 
 
