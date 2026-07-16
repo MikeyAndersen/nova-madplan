@@ -159,7 +159,14 @@ dev-pladsholdere:
 |---|---|
 | `MADPLAN_API_BASE` | `https://madplan-api.nova-tech.dk` |
 | `LIFEHUB_API_TOKEN` | `<A>` — samme som backendens token A |
-| `SITE_PASSWORD` | det eksisterende delte site-password |
+
+> **Adgang til sitet håndteres af tunnelen (Cloudflare Access), ikke af appen.**
+> `madplan.nova-tech.dk` redirecter uautentificerede til
+> `novatechmba.cloudflareaccess.com`. Det tidligere delte kodeord
+> (`SITE_PASSWORD` + HMAC-session-cookie) er **udgået** — der findes hverken
+> `login.astro`, session-middleware eller nogen `SITE_PASSWORD`-reference i
+> `src/`. Sæt den ikke; den gør ingenting. Ældre spec/plan-dokumenter i
+> `docs/superpowers/` beskriver stadig den gamle model — de er historik.
 
 ### 3) Deploy
 
@@ -171,9 +178,10 @@ npx wrangler deploy
 ### 4) Accept-kriterier før oprydning
 
 Den gamle D1-database + binding dekommissioneres **først** når kriterierne i
-spec §3.5 er verificeret på det deployede site: login virker, ugeplanen kan
-redigeres, forslag kan accepteres (enkeltdag + hel uge), fejlbanner vises når
-backenden er nede, og tokenet optræder ikke i klient-bundlet.
+spec §3.5 er verificeret på det deployede site: Access slipper en igennem,
+ugeplanen kan redigeres, forslag kan accepteres (enkeltdag + hel uge),
+fejlbanner vises når backenden er nede, og tokenet optræder ikke i
+klient-bundlet.
 
 ## Feature B — Beholdning (madplan-ejet)
 
