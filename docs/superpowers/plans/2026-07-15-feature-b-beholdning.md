@@ -1358,16 +1358,29 @@ Forventet: pytest alle grønne; vitest alle grønne; begge builds OK; `NO TOKEN 
 Følg `.claude/skills/verify/SKILL.md` (backend på :8400 med scratch-DB, `astro dev` på :4321, curl med `Origin`-header). Minimum:
 1. `/beholdning` → 200, tomme sektioner.
 2. Manuel vare: POST `/api/inventory` `action=add&name=Smør&category=koleskab&quantity=2&note=saltet` → vises under Køleskab med note.
-3. `/import`: POST raw nemlig-tekst til `/import` → bekræftelses-skærm; POST bekræftelsen til `/api/import` → kvittering; varen i `/beholdning`. Testdata (Format B, to varer):
+3. `/import`: POST raw nemlig-tekst til `/import` → bekræftelses-skærm; POST bekræftelsen til `/api/import` → kvittering; varen i `/beholdning`. Testdata = `FORMAT_A` verbatim fra `tests/nemlig/parser.test.ts` (autoritativ — parseren kræver enhed + kr.-linjer):
    ```
+   Drikke
+   Læskedrik m. hyldeblomstsmag
+   1 l
+   1
+   8,50 kr.
+   8,50 kr.
+   Frost
+   Rustik baguette øko.
+   350 g
+   1
+   19,96 kr.
+   4,99 kr.
+   19,96 kr.
    Køl
-   Smør saltet
-   1 stk.
-   Kolonial
-   Pasta penne
-   2 pk.
+   Letmælk 1,5%
+   1 l
+   4
+   10,95 kr.
+   43,80 kr.
    ```
-   (Hvis parseren afviser testdataen, brug en linje-struktur fra `tests/nemlig/parser.test.ts` som facit — den er autoritativ for formatet.)
+   Verificér `item_count="3"` i bekræftelses-HTML'en (grep IKKE efter varenavne — `<textarea>` ekkoer råteksten og giver falske hits).
 4. Merge: gem samme vare igen med "Læg til eksisterende" → quantity summeret, ingen dublet.
 5. Forbrug: `action=consume` med quantity=2 → 1 tilbage; igen → varen væk.
 6. Motor-integration (§4.4-4): `POST /api/suggestions/refresh` direkte mod backenden (Bearer dev) før/efter en beholdnings-ændring → `inventory_hash` i `GET /api/suggestions/current` skifter.
