@@ -48,9 +48,11 @@ def test_weekplan_contract_and_cooked_flow(client):
     assert len(plan["days"]) == 7
     assert plan["days"][0]["weekday"] == "mandag"
     wed = plan["days"][2]
-    assert set(wed) == {"date", "weekday", "dish_id", "dish_name", "status", "note"}
+    assert set(wed) == {"date", "weekday", "dish_id", "dish_name", "recipe_id",
+                        "status", "note"}
     assert wed == {"date": "2026-07-08", "weekday": "onsdag", "dish_id": dish_id,
-                   "dish_name": "Spaghetti bolognese", "status": "planned", "note": None}
+                   "dish_name": "Spaghetti bolognese", "recipe_id": None,
+                   "status": "planned", "note": None}
     assert plan["days"][3]["status"] == "empty"
 
     # cooked → last_made opdateres

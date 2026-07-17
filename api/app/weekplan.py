@@ -39,7 +39,8 @@ def build_weekplan(conn: sqlite3.Connection, week_start: date) -> WeekPlan:
     for i in range(7):
         d = week_start + timedelta(days=i)
         row = conn.execute(
-            "SELECT wd.dish_id, wd.status, wd.note, wd.updated_at, di.name AS dish_name"
+            "SELECT wd.dish_id, wd.status, wd.note, wd.updated_at, di.name AS dish_name,"
+            " di.recipe_id AS recipe_id"
             " FROM weekplan_days wd LEFT JOIN dishes di ON di.id = wd.dish_id"
             " WHERE wd.date = ?",
             (d.isoformat(),),
@@ -47,6 +48,7 @@ def build_weekplan(conn: sqlite3.Connection, week_start: date) -> WeekPlan:
         if row:
             days.append(Day(date=d.isoformat(), weekday=WEEKDAYS_DA[d.weekday()],
                             dish_id=row["dish_id"], dish_name=row["dish_name"],
+                            recipe_id=row["recipe_id"],
                             status=row["status"], note=row["note"]))
             if latest_update is None or row["updated_at"] > latest_update:
                 latest_update = row["updated_at"]

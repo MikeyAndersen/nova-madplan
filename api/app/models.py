@@ -46,6 +46,7 @@ class Day(BaseModel):
     weekday: str
     dish_id: int | None = None
     dish_name: str | None = None
+    recipe_id: int | None = None
     status: DayStatus = "empty"
     note: str | None = None
 
