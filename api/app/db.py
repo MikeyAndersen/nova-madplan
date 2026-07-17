@@ -70,6 +70,29 @@ CREATE TABLE IF NOT EXISTS inventory_items (
     updated_at TEXT NOT NULL
 );
 
+-- Opskrifter: scrapet + cachet. ingredients/steps/tags = JSON. raw_snapshot =
+-- fuld readable sidetekst (sikkerhedsnet). image_mime sat ⇒ billede findes.
+CREATE TABLE IF NOT EXISTS recipes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    source_url TEXT,
+    ingredients TEXT NOT NULL DEFAULT '[]',
+    steps TEXT NOT NULL DEFAULT '[]',
+    time_min INTEGER,
+    tags TEXT NOT NULL DEFAULT '[]',
+    raw_snapshot TEXT NOT NULL DEFAULT '',
+    image_mime TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Billed-bytes adskilt så list-queries ikke trækker BLOBs. Cascade-slet med opskrift.
+CREATE TABLE IF NOT EXISTS recipe_images (
+    recipe_id INTEGER PRIMARY KEY REFERENCES recipes(id) ON DELETE CASCADE,
+    bytes BLOB NOT NULL,
+    mime TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_history_dish ON history(dish_id);
 CREATE INDEX IF NOT EXISTS idx_suggest_queue_week ON suggest_queue(week_start, status);
 CREATE INDEX IF NOT EXISTS idx_suggestion_sets_week ON suggestion_sets(week_start);
@@ -81,6 +104,9 @@ def init_db() -> None:
     os.makedirs(os.path.dirname(config.DATABASE_PATH) or ".", exist_ok=True)
     with connect() as conn:
         conn.executescript(_SCHEMA)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(dishes)")}
+        if "recipe_id" not in cols:
+            conn.execute("ALTER TABLE dishes ADD COLUMN recipe_id INTEGER")
 
 
 @contextmanager
