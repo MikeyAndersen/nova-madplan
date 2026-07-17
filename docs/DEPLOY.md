@@ -202,3 +202,22 @@ Verifikation (§4.4): paste en nemlig-ordre → varer i beholdningen; tryk
 Genberegn under Forslag → `inventory_hash` i svaret fra
 `GET /api/suggestions/current` har skiftet; dashboard-kortet "Beholdning"
 dukker op; stop madplan-api → kortet viser "gemt kopi".
+
+## Opskrifter (recipe handler)
+
+**Ny backend-kode + nye Python-deps** (`recipe-scrapers`, `trafilatura`), så
+image'et SKAL genbygges — `restart` er ikke nok. API før frontend som altid:
+
+1. **madplan-api:** `cd /opt/nova-madplan && git pull && docker compose down && docker compose up -d --build`
+   (`recipes`/`recipe_images`-tabeller + `dishes.recipe_id`-kolonnen oprettes
+   automatisk ved opstart; migrationen er additiv og idempotent).
+2. **Frontend:** `npm ci && npm run build && npx wrangler deploy` fra repo-roden.
+   Nyt menupunkt "Opskrifter".
+
+Kontrakt-note: dish-JSON (§2.1) har nu et ekstra nullbart felt `recipe_id`.
+Additivt — brain/andre klienter ignorerer ukendte felter.
+
+Verifikation: paste en opskrift-URL under Opskrifter → preview → gem →
+opskriften vises med ingredienser/trin og cachet billede; "Vis original" viser
+den gemte kopi; "Opret ret fra opskrift" laver en ret linket til opskriften, og
+retten viser 📖 Opskrift-link på `/madplan`.
