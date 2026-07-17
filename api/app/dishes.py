@@ -21,7 +21,8 @@ def row_to_dish(row: sqlite3.Row) -> Dish:
     return Dish(id=row["id"], name=row["name"], tags=json.loads(row["tags"]),
                 recurring_weekly=bool(row["recurring_weekly"]),
                 ingredients=json.loads(row["ingredients"]),
-                last_made=row["last_made"], active=bool(row["active"]))
+                last_made=row["last_made"], active=bool(row["active"]),
+                recipe_id=row["recipe_id"])
 
 
 @router.get("", response_model=list[Dish])
@@ -49,11 +50,11 @@ def create_dish(body: DishCreate) -> Dish:
         try:
             cur = conn.execute(
                 "INSERT INTO dishes(name, tags, recurring_weekly, ingredients, active,"
-                " created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
+                " recipe_id, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?)",
                 (body.name.strip(), json.dumps(body.tags, ensure_ascii=False),
                  int(body.recurring_weekly),
                  json.dumps([i.model_dump() for i in body.ingredients], ensure_ascii=False),
-                 int(body.active), now, now),
+                 int(body.active), body.recipe_id, now, now),
             )
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409, detail=f"Dish name {body.name!r} already exists")

@@ -1,0 +1,166 @@
+---
+import Layout from '../../components/Layout.astro';
+import RecipeForm from '../../components/RecipeForm.astro';
+import { getApi, ApiError } from '../../lib/api';
+import type { Recipe, Dish } from '../../lib/api.types';
+
+const id = Number(Astro.params.id);
+const api = await getApi();
+let recipe: Recipe | null = null;
+let dishes: Dish[] = [];
+let err = '';
+try {
+  recipe = await api.getRecipe(id);
+} catch (e) {
+  if (e instanceof ApiError && e.status === 404) return Astro.redirect('/opskrifter');
+  err = e instanceof ApiError ? `Kunne ikke hente opskriften (${e.status}).` : 'Kunne ikke nå tjenesten.';
+}
+try {
+  dishes = await api.listDishes(false);
+} catch { /* non-fatal: dish bridges just won't populate */ }
+---
+
+<Layout title={recipe?.title ?? 'Opskrift'}>
+  {err && <p class="notice">{err}</p>}
+  {recipe && (
+    <>
+      <div class="section-head">
+        <a class="count-pill" href="/opskrifter">‹ Opskrifter</a>
+        <h1 style="margin:0;">{recipe.title}</h1>
+        <span></span>
+      </div>
+
+      {recipe.has_image && <img class="recipe-hero" src={`/api/recipes/${recipe.id}/image`} alt="" />}
+
+      <div class="small muted" style="margin:0.4rem 0 1rem;">
+        {[recipe.time_min ? `${recipe.time_min} min` : '', recipe.tags.join(' · ')].filter(Boolean).join(' · ')}
+        {recipe.source_url && <> · <a href={recipe.source_url} target="_blank" rel="noreferrer">Kilde ↗</a></>}
+      </div>
+
+      {recipe.ingredients.length > 0 && (
+        <div class="card">
+          <strong>Ingredienser</strong>
+          <ul>{recipe.ingredients.map((i) => <li>{i.name}</li>)}</ul>
+        </div>
+      )}
+
+      {recipe.steps.length > 0 && (
+        <div class="card">
+          <strong>Fremgangsmåde</strong>
+          <ol>{recipe.steps.map((s) => <li>{s}</li>)}</ol>
+        </div>
+      )}
+
+      {recipe.raw_snapshot && (
+        <details class="card">
+          <summary>Vis original (gemt kopi)</summary>
+          <pre class="snapshot">{recipe.raw_snapshot}</pre>
+        </details>
+      )}
+
+      <div class="card">
+        <strong>Brug i madplanen</strong>
+        <div class="row" style="gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
+          <button id="mk-dish" class="btn-primary" type="button">Opret ret fra opskrift</button>
+          <span id="mk-status" class="small muted"></span>
+        </div>
+        <div class="row" style="gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
+          <select id="link-dish-sel" style="flex:1; min-width:10rem;">
+            <option value="">Vælg ret…</option>
+            {dishes.map((d) => <option value={d.id}>{d.name}</option>)}
+          </select>
+          <button id="link-dish" class="btn-sm" type="button">Vedhæft til ret</button>
+          <span id="link-status" class="small muted"></span>
+        </div>
+      </div>
+
+      <details class="card">
+        <summary>Redigér opskrift</summary>
+        <RecipeForm recipe={recipe} formId="rf-edit" />
+        <div class="row" style="gap:0.5rem; margin-top:0.5rem;">
+          <button id="rf-edit-save" class="btn-primary" type="button">Gem ændringer</button>
+          <span id="rf-edit-status" class="small muted"></span>
+        </div>
+      </details>
+
+      <div style="margin-top:1rem;">
+        <button id="del-recipe" class="btn-sm" type="button">Slet opskrift</button>
+        <span id="del-status" class="small muted"></span>
+      </div>
+    </>
+  )}
+</Layout>
+
+<script is:inline define:vars={{ rid: recipe?.id ?? 0 }}>
+  (function () {
+    if (!rid) return;
+    var form = document.getElementById('rf-edit');
+    function getF(f) { var el = form.querySelector('[data-f="' + f + '"]'); return el ? el.value : ''; }
+
+    document.getElementById('rf-edit-save').addEventListener('click', async function () {
+      var status = document.getElementById('rf-edit-status');
+      var body = {
+        title: getF('title').trim(),
+        source_url: getF('source_url').trim() || null,
+        ingredients: getF('ingredients').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).map(function (n) { return { name: n }; }),
+        steps: getF('steps').split('\n').map(function (s) { return s.trim(); }).filter(Boolean),
+        tags: getF('tags').split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+        raw_snapshot: getF('raw_snapshot'),
+      };
+      var tm = getF('time_min'); body.time_min = tm ? Number(tm) : null;
+      if (!body.title) { status.textContent = 'Titel mangler.'; return; }
+      status.textContent = 'Gemmer…';
+      try {
+        var res = await fetch('/api/recipes/' + rid, {
+          method: 'PATCH', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error('patch');
+        location.reload();
+      } catch (e) { status.textContent = 'Kunne ikke gemme.'; }
+    });
+
+    document.getElementById('mk-dish').addEventListener('click', async function () {
+      var status = document.getElementById('mk-status');
+      status.textContent = 'Opretter…';
+      try {
+        var res = await fetch('/api/recipes/' + rid + '/make-dish', { method: 'POST' });
+        if (!res.ok) throw new Error('mk');
+        status.innerHTML = 'Ret oprettet ✓ — <a href="/madplan">gå til madplanen</a>';
+      } catch (e) { status.textContent = 'Kunne ikke oprette ret.'; }
+    });
+
+    document.getElementById('link-dish').addEventListener('click', async function () {
+      var status = document.getElementById('link-status');
+      var sel = document.getElementById('link-dish-sel');
+      if (!sel.value) { status.textContent = 'Vælg en ret.'; return; }
+      status.textContent = 'Vedhæfter…';
+      try {
+        var res = await fetch('/api/recipes/' + rid + '/link-dish', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dish_id: Number(sel.value) }),
+        });
+        if (!res.ok) throw new Error('link');
+        status.textContent = 'Vedhæftet ✓';
+      } catch (e) { status.textContent = 'Kunne ikke vedhæfte.'; }
+    });
+
+    document.getElementById('del-recipe').addEventListener('click', async function () {
+      if (!confirm('Slet denne opskrift?')) return;
+      var status = document.getElementById('del-status');
+      status.textContent = 'Sletter…';
+      try {
+        var res = await fetch('/api/recipes/' + rid, { method: 'DELETE' });
+        if (!res.ok && res.status !== 204) throw new Error('del');
+        location.href = '/opskrifter';
+      } catch (e) { status.textContent = 'Kunne ikke slette.'; }
+    });
+  })();
+</script>
+
+<style>
+  .recipe-hero { width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius); }
+  .snapshot { white-space: pre-wrap; word-break: break-word; font: inherit; margin-top: 0.5rem; max-height: 60vh; overflow: auto; }
+  .card ul, .card ol { margin: 0.5rem 0 0; padding-left: 1.3rem; }
+  .card li { margin: 0.2rem 0; }
+</style>

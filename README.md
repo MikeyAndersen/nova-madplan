@@ -42,6 +42,9 @@ se `docs/PROJECT_OVERVIEW.md`.
 | POST | `/api/suggestions/refresh` | Bearer | Genberegn forslag |
 | POST | `/api/suggestions/accept` | Bearer | Accepter forslag (enkeltdag eller hel uge) |
 | GET/POST/PATCH/DELETE | `/api/inventory` | Bearer | Beholdning (CRUD + bulk-add med merge-på-navn) |
+| POST | `/api/recipes/scrape` | Bearer | Scrape URL → preview (gemmer ikke) |
+| GET/POST/PATCH/DELETE | `/api/recipes` | Bearer | Opskrifter (CRUD + cachet billede) |
+| GET | `/api/recipes/{id}/image` | Bearer | Cachet billede-bytes |
 | POST | `/api/drain` | `MADPLAN_DRAIN_TOKEN` | 32b-agentens additive drain (§5) |
 
 Forslags-motoren (14-dages-regel, lager-scoring, 7b-ranking + deterministisk

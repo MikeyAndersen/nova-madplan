@@ -10,6 +10,7 @@ interface Props {
   readOnly?: boolean;
 }
 const { day, dishes, weekStart, readOnly = false } = Astro.props;
+const dish = day.dish_id != null ? dishes.find((d) => d.id === day.dish_id) : undefined;
 const planned = day.status === 'planned' || day.status === 'cooked';
 const state = day.status === 'cooked' ? 'cooked' : planned ? 'planned' : 'empty';
 ---
@@ -22,6 +23,7 @@ const state = day.status === 'cooked' ? 'cooked' : planned ? 'planned' : 'empty'
 
   <div class="meal-body">
     {day.dish_name && <div class="meal-title">{day.status === 'cooked' ? '✅ ' : ''}{day.dish_name}</div>}
+    {dish?.recipe_id && <a class="small recipe-link" href={`/opskrifter/${dish.recipe_id}`}>📖 Opskrift</a>}
     {!day.dish_name && <div class="meal-empty">Ingen plan endnu</div>}
     {day.note && <div class="small muted">{day.note}</div>}
     {day.status === 'skipped' && <div class="small muted">Sprunget over</div>}

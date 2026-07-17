@@ -1,0 +1,159 @@
+---
+import Layout from '../../components/Layout.astro';
+import RecipeForm from '../../components/RecipeForm.astro';
+import { getApi, ApiError } from '../../lib/api';
+import type { Recipe } from '../../lib/api.types';
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const api = await getApi();
+let recipes: Recipe[] = [];
+let loadError = '';
+try {
+  recipes = await api.listRecipes(q || undefined);
+} catch (e) {
+  loadError = e instanceof ApiError ? `Kunne ikke hente opskrifter (${e.status}).` : 'Kunne ikke nå tjenesten.';
+}
+---
+
+<Layout title="Opskrifter">
+  <h1>Opskrifter</h1>
+  {loadError && <p class="notice">{loadError}</p>}
+
+  <form method="get" class="row" style="gap:0.5rem; margin-bottom:1rem;">
+    <input name="q" value={q} placeholder="Søg titel eller ingrediens…" style="flex:1;" />
+    <button class="btn-sm" type="submit">Søg</button>
+  </form>
+
+  <details class="add-recipe">
+    <summary>Tilføj opskrift</summary>
+    <div class="tabs" style="margin:0.6rem 0;">
+      <label><input type="radio" name="rf-mode" value="url" checked /> URL</label>
+      <label><input type="radio" name="rf-mode" value="manual" /> Manuel</label>
+      <label><input type="radio" name="rf-mode" value="paste" /> Indsæt tekst</label>
+    </div>
+
+    <div data-panel="url" class="rf-panel">
+      <div class="row" style="gap:0.5rem;">
+        <input id="rf-url" placeholder="https://…" style="flex:1;" />
+        <button id="rf-fetch" class="btn-sm" type="button">Hent</button>
+      </div>
+      <span id="rf-fetch-status" class="small muted"></span>
+    </div>
+
+    <div data-panel="paste" class="rf-panel" style="display:none;">
+      <textarea id="rf-paste" rows="6" placeholder="Indsæt opskrift-tekst… (første linje bliver titel)" style="width:100%; font:inherit; padding:0.5rem;"></textarea>
+      <button id="rf-usetext" class="btn-sm" type="button" style="margin-top:0.4rem;">Brug tekst</button>
+    </div>
+
+    <RecipeForm formId="rf-add" />
+
+    <div class="row" style="gap:0.5rem; margin-top:0.6rem;">
+      <button id="rf-save" class="btn-primary" type="button">Gem opskrift</button>
+      <span id="rf-save-status" class="small muted"></span>
+    </div>
+  </details>
+
+  <div class="cards" style="margin-top:1rem;">
+    {recipes.map((r) => (
+      <a class="card recipe-card" href={`/opskrifter/${r.id}`}>
+        {r.has_image && <img class="recipe-thumb" src={`/api/recipes/${r.id}/image`} alt="" loading="lazy" />}
+        <div class="recipe-meta">
+          <strong>{r.title}</strong>
+          <div class="small muted">
+            {[r.time_min ? `${r.time_min} min` : '', r.tags.join(' · ')].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+      </a>
+    ))}
+    {recipes.length === 0 && !loadError && <p class="empty">Ingen opskrifter endnu. Tilføj den første.</p>}
+  </div>
+</Layout>
+
+<script is:inline>
+  (function () {
+    var form = document.getElementById('rf-add');
+    function setF(f, val) { var el = form.querySelector('[data-f="' + f + '"]'); if (el) el.value = val == null ? '' : String(val); }
+    function getF(f) { var el = form.querySelector('[data-f="' + f + '"]'); return el ? el.value : ''; }
+
+    // Tab-skift
+    document.querySelectorAll('input[name="rf-mode"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        document.querySelectorAll('.rf-panel').forEach(function (p) {
+          p.style.display = p.getAttribute('data-panel') === r.value ? 'block' : 'none';
+        });
+      });
+    });
+
+    // URL → scrape → udfyld form
+    document.getElementById('rf-fetch').addEventListener('click', async function () {
+      var status = document.getElementById('rf-fetch-status');
+      var url = (document.getElementById('rf-url').value || '').trim();
+      if (!url) return;
+      status.textContent = 'Henter…';
+      try {
+        var res = await fetch('/api/recipes/scrape', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ url: url }),
+        });
+        if (!res.ok) throw new Error('scrape');
+        var prev = await res.json();
+        var p = prev.parsed || {};
+        setF('title', p.title || '');
+        setF('ingredients', (p.ingredients || []).map(function (i) { return i.name; }).join('\n'));
+        setF('steps', (p.steps || []).join('\n'));
+        setF('time_min', p.time_min || '');
+        setF('source_url', p.source_url || url);
+        setF('raw_snapshot', p.raw_snapshot || '');
+        setF('image_url', prev.image_url || '');
+        status.textContent = prev.ok ? 'Hentet — tjek felterne og gem.' : (prev.warning || 'Delvist hentet — udfyld selv.');
+      } catch (e) {
+        status.textContent = 'Kunne ikke hente. Prøv Manuel/Indsæt tekst.';
+      }
+    });
+
+    // Indsæt tekst → form
+    document.getElementById('rf-usetext').addEventListener('click', function () {
+      var text = document.getElementById('rf-paste').value || '';
+      var first = text.split('\n').map(function (s) { return s.trim(); }).filter(Boolean)[0] || 'Ny opskrift';
+      setF('title', first);
+      setF('raw_snapshot', text);
+    });
+
+    // Gem
+    document.getElementById('rf-save').addEventListener('click', async function () {
+      var status = document.getElementById('rf-save-status');
+      var title = getF('title').trim();
+      if (!title) { status.textContent = 'Titel mangler.'; return; }
+      var body = {
+        title: title,
+        source_url: getF('source_url').trim() || null,
+        ingredients: getF('ingredients').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).map(function (n) { return { name: n }; }),
+        steps: getF('steps').split('\n').map(function (s) { return s.trim(); }).filter(Boolean),
+        tags: getF('tags').split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+        raw_snapshot: getF('raw_snapshot'),
+      };
+      var tm = getF('time_min'); if (tm) body.time_min = Number(tm);
+      var img = getF('image_url'); if (img) body.image_url = img;
+      status.textContent = 'Gemmer…';
+      try {
+        var res = await fetch('/api/recipes', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error('create');
+        var r = await res.json();
+        location.href = '/opskrifter/' + r.id;
+      } catch (e) {
+        status.textContent = 'Kunne ikke gemme.';
+      }
+    });
+  })();
+</script>
+
+<style>
+  .add-recipe summary { cursor: pointer; font-weight: 600; }
+  .tabs label { margin-right: 0.8rem; font-weight: 600; }
+  .recipe-card { display: flex; gap: 0.75rem; align-items: center; text-decoration: none; color: inherit; }
+  .recipe-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); flex-shrink: 0; }
+  .recipe-meta { min-width: 0; }
+</style>

@@ -20,7 +20,7 @@ def test_dish_crud(client):
     assert resp.status_code == 201
     dish = resp.json()
     assert set(dish) == {"id", "name", "tags", "recurring_weekly", "ingredients",
-                         "last_made", "active"}  # kontrakt 2.1, præcis
+                         "last_made", "active", "recipe_id"}  # kontrakt 2.1 + recipe-link
     assert dish["last_made"] is None and dish["active"] is True
 
     # Duplikat (case-insensitivt) afvises

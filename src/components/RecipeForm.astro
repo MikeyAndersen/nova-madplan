@@ -1,0 +1,24 @@
+---
+import type { Recipe } from '../lib/api.types';
+interface Props { recipe?: Recipe | null; formId: string; }
+const { recipe = null, formId } = Astro.props;
+const ing = recipe ? recipe.ingredients.map((i) => i.name).join('\n') : '';
+const steps = recipe ? recipe.steps.join('\n') : '';
+const tags = recipe ? recipe.tags.join(', ') : '';
+---
+<div class="recipe-form" id={formId}>
+  <div class="field"><label>Titel</label><input data-f="title" value={recipe?.title ?? ''} required placeholder="fx Kødsovs" /></div>
+  <div class="field"><label>Ingredienser (én pr. linje)</label><textarea data-f="ingredients" rows="6">{ing}</textarea></div>
+  <div class="field"><label>Fremgangsmåde (ét trin pr. linje)</label><textarea data-f="steps" rows="6">{steps}</textarea></div>
+  <div class="row" style="gap:0.5rem;">
+    <div class="field" style="flex:1;"><label>Tid (min)</label><input data-f="time_min" type="number" min="0" value={recipe?.time_min ?? ''} /></div>
+    <div class="field" style="flex:2;"><label>Tags (komma)</label><input data-f="tags" value={tags} placeholder="hverdag, vegetar" /></div>
+  </div>
+  <div class="field"><label>Kilde (URL)</label><input data-f="source_url" value={recipe?.source_url ?? ''} /></div>
+  <input type="hidden" data-f="raw_snapshot" value={recipe?.raw_snapshot ?? ''} />
+  <input type="hidden" data-f="image_url" value="" />
+</div>
+
+<style>
+  .recipe-form textarea { width: 100%; font: inherit; padding: 0.5rem; }
+</style>
