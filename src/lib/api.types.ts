@@ -29,6 +29,7 @@ export interface Dish {
 	ingredients: Ingredient[];
 	last_made: string | null;
 	active: boolean;
+	recipe_id?: number | null;
 }
 
 export interface DishInput {
@@ -37,6 +38,39 @@ export interface DishInput {
 	recurring_weekly?: boolean;
 	ingredients?: Ingredient[];
 	active?: boolean;
+	recipe_id?: number | null;
+}
+
+export interface Recipe {
+	id: number;
+	title: string;
+	source_url: string | null;
+	ingredients: Ingredient[];
+	steps: string[];
+	time_min: number | null;
+	tags: string[];
+	raw_snapshot: string;
+	has_image: boolean;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface RecipeInput {
+	title: string;
+	source_url?: string | null;
+	ingredients?: Ingredient[];
+	steps?: string[];
+	time_min?: number | null;
+	tags?: string[];
+	raw_snapshot?: string;
+	image_url?: string | null;
+}
+
+export interface ScrapePreview {
+	parsed: Omit<RecipeInput, 'image_url'>;
+	image_url: string | null;
+	ok: boolean;
+	warning?: string;
 }
 
 export interface Suggestion {

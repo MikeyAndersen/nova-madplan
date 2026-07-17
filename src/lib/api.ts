@@ -1,4 +1,4 @@
-import type { WeekPlan, Dish, DishInput, SuggestionSet, DayStatus, InventoryItem, InventoryItemInput } from './api.types';
+import type { WeekPlan, Dish, DishInput, SuggestionSet, DayStatus, InventoryItem, InventoryItemInput, Recipe, RecipeInput, ScrapePreview } from './api.types';
 export type * from './api.types';
 
 export class ApiError extends Error {
@@ -64,6 +64,16 @@ export function makeApi(base: string, token: string, fetchImpl: typeof fetch = f
 		updateInventoryItem: (id: number, patch: Partial<InventoryItemInput>) =>
 			call<InventoryItem>(`/api/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
 		deleteInventoryItem: (id: number) => call<void>(`/api/inventory/${id}`, { method: 'DELETE' }),
+		scrapeRecipe: (url: string) =>
+			call<ScrapePreview>('/api/recipes/scrape', { method: 'POST', body: JSON.stringify({ url }) }),
+		listRecipes: (q?: string) =>
+			call<Recipe[]>(`/api/recipes${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+		getRecipe: (id: number) => call<Recipe>(`/api/recipes/${id}`),
+		createRecipe: (b: RecipeInput) =>
+			call<Recipe>('/api/recipes', { method: 'POST', body: JSON.stringify(b) }),
+		updateRecipe: (id: number, b: Partial<RecipeInput>) =>
+			call<Recipe>(`/api/recipes/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
+		deleteRecipe: (id: number) => call<void>(`/api/recipes/${id}`, { method: 'DELETE' }),
 	};
 }
 
