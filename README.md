@@ -6,9 +6,13 @@ stack. Dansk, mobil-først.
 
 > **Kontrakt:** Al integration mod LifeHub er styret af
 > [`lifehub/docs/INTEGRATION_SPEC.md`](../lifehub/docs/INTEGRATION_SPEC.md).
-> Ansvarsfordeling (§A2/§A3): madplan ejer retter/ugeplaner/historik/forslag;
-> lager ejes af LifeHub/Vikunja og hentes via brain — madplan taler aldrig direkte
-> med Vikunja.
+> Ansvarsfordeling: madplan ejer retter/ugeplaner/historik/forslag **og beholdning**.
+> Beholdningen er **madplan-ejet** siden Feature B (2026-07-16, egen
+> `inventory_items`-tabel); forslags-motoren læser sin egen tabel og bruger ikke
+> længere brains `/api/internal/inventory`. brain poller nu madplans beholdning til
+> dashboardet (retningen er vendt om). madplan taler fortsat aldrig direkte med Vikunja.
+>
+> Se [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md) for fuldt projektoverblik.
 
 ## Stack
 
@@ -19,11 +23,13 @@ stack. Dansk, mobil-først.
   ingen hardcoded secrets, API'et fejler lukket uden token (§0.4).
 - Tests: **pytest**.
 
-Astro/Cloudflare Workers-stacken er udgået (juli 2026) — erstattet af denne service
-som del af nova-madplan ↔ LifeHub-integrationen. Gammel D1-data er migreret ind via
-`api/scripts/migrate_d1.py`.
+Den **gamle Astro + Cloudflare D1**-stack (database i D1) er udgået (juli 2026) —
+databasen er flyttet til denne FastAPI+SQLite-service, og gammel D1-data er migreret
+ind via `api/scripts/migrate_d1.py`. Den **nuværende frontend** er stadig Astro på
+Cloudflare Workers (Fase 7), men kører nu som BFF mod dette API i stedet for mod D1 —
+se `docs/PROJECT_OVERVIEW.md`.
 
-## API (Fase 1)
+## API
 
 | Metode | Path | Auth | Beskrivelse |
 |--------|------|------|-------------|
@@ -32,9 +38,15 @@ som del af nova-madplan ↔ LifeHub-integrationen. Gammel D1-data er migreret in
 | GET | `/api/weekplan?start=YYYY-MM-DD` | Bearer | Vilkårlig uge |
 | PUT | `/api/weekplan/day` | Bearer | Sæt/ryd en dag; `cooked` ⇄ historik ⇄ `last_made` vedligeholdes |
 | GET/POST/PATCH/DELETE | `/api/dishes` | Bearer | Ret-katalog (CRUD, soft delete) |
+| GET | `/api/suggestions/current` | Bearer | Ugens AI-forslag |
+| POST | `/api/suggestions/refresh` | Bearer | Genberegn forslag |
+| POST | `/api/suggestions/accept` | Bearer | Accepter forslag (enkeltdag eller hel uge) |
+| GET/POST/PATCH/DELETE | `/api/inventory` | Bearer | Beholdning (CRUD + bulk-add med merge-på-navn) |
+| POST | `/api/drain` | `MADPLAN_DRAIN_TOKEN` | 32b-agentens additive drain (§5) |
 
-Forslags-motor, brain-inventory-integration og 32b-drain kommer i senere faser
-(§7 Fase 4–5).
+Forslags-motoren (14-dages-regel, lager-scoring, 7b-ranking + deterministisk
+fallback) og 32b-drain er implementeret. Se
+[`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md).
 
 ## Udvikling
 
