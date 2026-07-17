@@ -221,3 +221,20 @@ Verifikation: paste en opskrift-URL under Opskrifter → preview → gem →
 opskriften vises med ingredienser/trin og cachet billede; "Vis original" viser
 den gemte kopi; "Opret ret fra opskrift" laver en ret linket til opskriften, og
 retten viser 📖 Opskrift-link på `/madplan`.
+
+### Mængde-fallback (headless Chromium)
+
+Nogle sider (fx **nemlig**) renderer ingrediens-**mængderne** med JavaScript, så
+den statiske HTML kun har navne. Scraperen kører derfor en hurtig sti (httpx)
+først, og **kun hvis mængder mangler** spinnes headless Chromium (Playwright) op
+og trækker mængderne fra den renderede DOM. Fanger den stadig ingen mængder,
+flagges det i preview ("⚠️ Mængder mangler — tjek og udfyld dem selv").
+
+**Deploy-konsekvens:** Dockerfile kører nu `playwright install --with-deps
+chromium` — **image'et vokser (~400 MB) og build tager længere**. Første
+`docker compose up -d --build` efter denne ændring downloader Chromium + apt-libs.
+Kun backend berøres — **ingen frontend-deploy nødvendig** for denne fix
+(preview surfacer allerede warning, og ingredienser er blot strenge).
+Fallback'en er ~5–7 s pr. render; hurtig sti (<1 s) bruges når mængder allerede
+er til stede. Mangler Chromium af en eller anden grund, degraderer scraperen
+pænt til flag-adfærd.
