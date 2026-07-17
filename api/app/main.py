@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, HTTPException, Request
 
-from . import config, db, dishes, inventory, suggest, suggestions, weekplan
+from . import config, db, dishes, inventory, recipes, suggest, suggestions, weekplan
 
 log = logging.getLogger("madplan")
 scheduler = AsyncIOScheduler(timezone=config.TIMEZONE)
@@ -31,6 +31,7 @@ app.include_router(dishes.router)
 app.include_router(inventory.router)
 app.include_router(weekplan.router)
 app.include_router(suggestions.router)
+app.include_router(recipes.router)
 
 
 @app.post("/api/drain")
