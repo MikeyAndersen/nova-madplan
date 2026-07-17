@@ -4,7 +4,7 @@ interface Props { weekStart: string; dishes: Dish[]; }
 const { weekStart, dishes } = Astro.props;
 ---
 <details class="quickfill">
-  <summary>Indsæt uge fra tekst</summary>
+  <summary>Skriv hele ugen (Mandag: ret …)</summary>
   <textarea id="qf-raw" rows="7" placeholder="Mandag: Kødsovs&#10;Tirsdag: grill+rester&#10;…"></textarea>
   <div class="row" style="gap:0.5rem; margin:0.5rem 0;">
     <button id="qf-preview" class="btn-primary" type="button">Vis preview</button>
@@ -140,12 +140,12 @@ const { weekStart, dishes } = Astro.props;
         await fetch('/api/suggestions/refresh', { method: 'POST' });
         var started = Date.now();
         var timer = setInterval(async function () {
-          if (Date.now() - started > 180000) { clearInterval(timer); aiStatus.textContent = 'Tog for lang tid — åbn Forslag manuelt.'; btn.disabled = false; return; }
+          if (Date.now() - started > 180000) { clearInterval(timer); aiStatus.textContent = 'Tog for lang tid — åbn AI-forslag manuelt.'; btn.disabled = false; return; }
           var r = await fetch('/api/suggestions/poll'); var j = await r.json();
           if (j.updated_at && j.updated_at !== before) { clearInterval(timer); location.href = '/forslag'; }
         }, 5000);
       } catch (e) {
-        aiStatus.textContent = 'Kunne ikke starte. Åbn Forslag manuelt.';
+        aiStatus.textContent = 'Kunne ikke starte. Åbn AI-forslag manuelt.';
         btn.disabled = false;
       }
     });
