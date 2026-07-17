@@ -39,11 +39,10 @@ def row_to_recipe(row: sqlite3.Row) -> Recipe:
 @router.post("/scrape", response_model=ScrapePreview)
 def scrape_url(body: ScrapeBody) -> ScrapePreview:
     try:
-        html = scrape.fetch_html(body.url)
+        return scrape.scrape_recipe_smart(body.url)
     except Exception:
         raise HTTPException(status_code=502,
                             detail="Kunne ikke hente siden. Prøv igen eller indtast manuelt.")
-    return scrape.parse_recipe(html, body.url)
 
 
 @router.get("", response_model=list[Recipe])
