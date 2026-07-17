@@ -20,6 +20,7 @@ class Dish(BaseModel):
     ingredients: list[Ingredient] = []
     last_made: str | None = None
     active: bool = True
+    recipe_id: int | None = None
 
 
 class DishCreate(BaseModel):
@@ -28,6 +29,7 @@ class DishCreate(BaseModel):
     recurring_weekly: bool = False
     ingredients: list[Ingredient] = []
     active: bool = True
+    recipe_id: int | None = None
 
 
 class DishUpdate(BaseModel):
@@ -36,6 +38,7 @@ class DishUpdate(BaseModel):
     recurring_weekly: bool | None = None
     ingredients: list[Ingredient] | None = None
     active: bool | None = None
+    recipe_id: int | None = None
 
 
 class Day(BaseModel):
@@ -111,3 +114,42 @@ class InventoryItem(InventoryItemIn):
     name_key: str
     added_at: str
     updated_at: str
+
+
+# ── Opskrifter ──────────────────────────────────────────────────────
+class RecipeCreate(BaseModel):
+    title: str = Field(min_length=1)
+    source_url: str | None = None
+    ingredients: list[Ingredient] = []
+    steps: list[str] = []
+    time_min: int | None = None
+    tags: list[str] = []
+    raw_snapshot: str = ""
+
+
+class RecipeInput(RecipeCreate):
+    """Alias for readability at call sites; identical shape to RecipeCreate."""
+
+
+class RecipePatch(BaseModel):
+    title: str | None = Field(default=None, min_length=1)
+    source_url: str | None = None
+    ingredients: list[Ingredient] | None = None
+    steps: list[str] | None = None
+    time_min: int | None = None
+    tags: list[str] | None = None
+    raw_snapshot: str | None = None
+
+
+class Recipe(RecipeCreate):
+    id: int
+    has_image: bool = False
+    created_at: str
+    updated_at: str
+
+
+class ScrapePreview(BaseModel):
+    parsed: RecipeCreate
+    image_url: str | None = None
+    ok: bool = True
+    warning: str | None = None
