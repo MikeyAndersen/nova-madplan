@@ -41,6 +41,8 @@ se `docs/PROJECT_OVERVIEW.md`.
 | GET | `/api/suggestions/current` | Bearer | Ugens AI-forslag |
 | POST | `/api/suggestions/refresh` | Bearer | Genberegn forslag |
 | POST | `/api/suggestions/accept` | Bearer | Accepter forslag (enkeltdag eller hel uge) |
+| POST | `/api/suggestions/reject` · `/reject-all` · `/reset-rejections` | Bearer | Forkast-hukommelse (Feature B) |
+| GET | `/api/stats` | Bearer | Statistik: antal-lavet pr. ret + pr. måned |
 | GET/POST/PATCH/DELETE | `/api/inventory` | Bearer | Beholdning (CRUD + bulk-add med merge-på-navn) |
 | POST | `/api/recipes/scrape` | Bearer | Scrape URL → preview (gemmer ikke) |
 | GET/POST/PATCH/DELETE | `/api/recipes` | Bearer | Opskrifter (CRUD + cachet billede) |

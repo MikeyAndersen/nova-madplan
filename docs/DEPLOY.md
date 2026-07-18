@@ -238,3 +238,17 @@ Kun backend berøres — **ingen frontend-deploy nødvendig** for denne fix
 Fallback'en er ~5–7 s pr. render; hurtig sti (<1 s) bruges når mængder allerede
 er til stede. Mangler Chromium af en eller anden grund, degraderer scraperen
 pænt til flag-adfærd.
+
+## Madplan-UX: smart ret-vælger, forkast-hukommelse & statistik
+
+**Ingen nye deps.** Backend får `/api/stats` + forkast-endpoints og en ny tabel
+`suggestion_rejections` (oprettes automatisk ved opstart). API før frontend:
+
+1. **madplan-api:** `cd /opt/nova-madplan && git pull && docker compose down && docker compose up -d --build`
+2. **Frontend:** `npm ci && npm run build && npx wrangler deploy`. Nyt nav-punkt
+   "Statistik"; `/madplan` "+ Tilføj ret" er nu en søgbar vælger (retter + opskrifter
+   + AI-forslag med kilde-badges); `/forslag` har 👎 Forkast + "Forkast alle".
+
+Verifikation: på `/madplan` "+ Tilføj ret" → skriv, se badges, pil-ned+Enter;
+på `/forslag` forkast en ret + Genberegn → den undgås; `/statistik` viser
+antal-lavet pr. ret + måned.
