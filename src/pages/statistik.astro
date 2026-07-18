@@ -1,0 +1,116 @@
+---
+import Layout from '../components/Layout.astro';
+import { getApi, ApiError } from '../lib/api';
+import type { Stats } from '../lib/api.types';
+
+const api = await getApi();
+let stats: Stats | null = null;
+let err = '';
+try {
+  stats = await api.getStats();
+} catch (e) {
+  err = e instanceof ApiError ? `Kunne ikke hente statistik (${e.status}).` : 'Kunne ikke nå tjenesten.';
+}
+
+const monthsDa = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+function monthLabel(m: string): string {
+  const [y, mm] = m.split('-');
+  return `${monthsDa[Number(mm) - 1] ?? mm} ${String(y).slice(2)}`;
+}
+
+const topDishes = stats ? stats.dishes.slice(0, 12) : [];
+const maxTimes = topDishes.reduce((m, d) => Math.max(m, d.times_made), 0) || 1;
+const perMonth = stats ? stats.per_month.slice(-12) : [];
+const maxMonth = perMonth.reduce((m, x) => Math.max(m, x.count), 0) || 1;
+---
+
+<Layout title="Statistik">
+  <h1>Statistik</h1>
+  {err && <p class="notice">{err}</p>}
+  {stats && (
+    <>
+      <div class="stat-hero">
+        <span class="stat-num">{stats.total_cooked}</span>
+        <span class="small muted">måltider lavet i alt</span>
+      </div>
+
+      {topDishes.length === 0 && <p class="empty">Ingen tilberedte retter endnu.</p>}
+
+      {topDishes.length > 0 && (
+        <section>
+          <h2>Mest lavede retter</h2>
+          <div class="bars" role="img" aria-label="Antal gange hver ret er lavet">
+            {topDishes.map((d) => (
+              <div class="bar-row">
+                <span class="bar-label" title={d.name}>{d.name}</span>
+                <span class="bar-track">
+                  <span class="bar-fill" style={`width:${Math.max(6, (d.times_made / maxTimes) * 100)}%`}></span>
+                </span>
+                <span class="bar-value">{d.times_made}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {perMonth.length > 0 && (
+        <section>
+          <h2>Måltider pr. måned</h2>
+          <div class="months" role="img" aria-label="Antal måltider pr. måned">
+            {perMonth.map((x) => (
+              <div class="month-col">
+                <span class="month-bar" style={`height:${Math.max(6, (x.count / maxMonth) * 100)}%`} title={`${x.count}`}></span>
+                <span class="month-count small">{x.count}</span>
+                <span class="month-label small muted">{monthLabel(x.month)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {stats.dishes.length > 0 && (
+        <section>
+          <h2>Alle retter</h2>
+          <div class="table-wrap">
+            <table class="stat-table">
+              <thead><tr><th>Ret</th><th>Antal gange</th><th>Sidst lavet</th></tr></thead>
+              <tbody>
+                {stats.dishes.map((d) => (
+                  <tr><td>{d.name}</td><td>{d.times_made}</td><td>{d.last_made ?? '—'}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </>
+  )}
+</Layout>
+
+<style>
+  .stat-hero { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.5rem 0 1.5rem; }
+  .stat-num { font-size: 2.6rem; font-weight: 700; line-height: 1; }
+  section { margin-top: 1.5rem; }
+  section h2 { margin-bottom: 0.7rem; }
+
+  /* Vandrette søjler: én-hue magnitude, afrundede ender, direkte tal-labels. */
+  .bars { display: flex; flex-direction: column; gap: 0.4rem; }
+  .bar-row { display: grid; grid-template-columns: minmax(6rem, 11rem) 1fr auto; align-items: center; gap: 0.6rem; }
+  .bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; }
+  .bar-track { background: var(--surface-2); border-radius: 999px; height: 0.85rem; overflow: hidden; }
+  .bar-fill { display: block; height: 100%; border-radius: 999px;
+    background: var(--accent, #4a7a5a); }
+  .bar-value { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 1.5rem; text-align: right; }
+
+  /* Lodrette månedssøjler. */
+  .months { display: flex; align-items: flex-end; gap: 0.5rem; height: 10rem; overflow-x: auto; padding-top: 0.5rem; }
+  .month-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0.25rem; min-width: 2.2rem; height: 100%; }
+  .month-bar { width: 1.4rem; background: var(--accent, #4a7a5a); border-radius: 4px 4px 0 0; min-height: 4px; }
+  .month-count { font-variant-numeric: tabular-nums; }
+  .month-label { white-space: nowrap; }
+
+  .table-wrap { overflow-x: auto; }
+  .stat-table { width: 100%; border-collapse: collapse; }
+  .stat-table th, .stat-table td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+  .stat-table td:nth-child(2), .stat-table th:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
