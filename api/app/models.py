@@ -154,3 +154,22 @@ class ScrapePreview(BaseModel):
     image_url: str | None = None
     ok: bool = True
     warning: str | None = None
+
+
+# ── Statistik (Feature D) ───────────────────────────────────────────
+class DishStat(BaseModel):
+    dish_id: int
+    name: str
+    times_made: int
+    last_made: str | None = None
+
+
+class MonthCount(BaseModel):
+    month: str
+    count: int
+
+
+class StatsResponse(BaseModel):
+    total_cooked: int
+    dishes: list[DishStat] = []
+    per_month: list[MonthCount] = []

@@ -1,4 +1,4 @@
-import type { WeekPlan, Dish, DishInput, SuggestionSet, DayStatus, InventoryItem, InventoryItemInput, Recipe, RecipeInput, ScrapePreview } from './api.types';
+import type { WeekPlan, Dish, DishInput, SuggestionSet, DayStatus, InventoryItem, InventoryItemInput, Recipe, RecipeInput, ScrapePreview, Stats } from './api.types';
 export type * from './api.types';
 
 export class ApiError extends Error {
@@ -74,6 +74,7 @@ export function makeApi(base: string, token: string, fetchImpl: typeof fetch = f
 		updateRecipe: (id: number, b: Partial<RecipeInput>) =>
 			call<Recipe>(`/api/recipes/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
 		deleteRecipe: (id: number) => call<void>(`/api/recipes/${id}`, { method: 'DELETE' }),
+		getStats: () => call<Stats>('/api/stats'),
 	};
 }
 
