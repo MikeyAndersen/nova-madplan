@@ -17,9 +17,17 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 	let dishId: number | null = null;
 	if (status !== 'empty') {
 		const existing = s(data, 'dish_id');
+		const recipeId = s(data, 'recipe_id');
 		const newName = s(data, 'new_dish_name');
-		if (existing) dishId = Number(existing);
-		else if (newName) dishId = (await api.createDish({ name: newName })).id;
+		if (existing) {
+			dishId = Number(existing);
+		} else if (recipeId) {
+			// Opskrift uden ret: opret en ret fra opskriften og link den.
+			const recipe = await api.getRecipe(Number(recipeId));
+			dishId = (await api.createDish({ name: recipe.title, ingredients: recipe.ingredients, recipe_id: recipe.id })).id;
+		} else if (newName) {
+			dishId = (await api.createDish({ name: newName })).id;
+		}
 	}
 	try {
 		await api.putDay({ date, status, dish_id: dishId, note });

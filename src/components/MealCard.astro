@@ -1,15 +1,17 @@
 ---
 import type { Day, Dish } from '../lib/api.types';
+import type { PickerOption } from '../lib/picker-options';
 import DishPicker from './DishPicker.astro';
 import { dayMonthDa } from '../lib/dates';
 
 interface Props {
   day: Day;
   dishes: Dish[];
+  options?: PickerOption[];
   weekStart: string;
   readOnly?: boolean;
 }
-const { day, dishes, weekStart, readOnly = false } = Astro.props;
+const { day, dishes, options = [], weekStart, readOnly = false } = Astro.props;
 const dish = day.dish_id != null ? dishes.find((d) => d.id === day.dish_id) : undefined;
 const planned = day.status === 'planned' || day.status === 'cooked';
 const state = day.status === 'cooked' ? 'cooked' : planned ? 'planned' : 'empty';
@@ -39,7 +41,7 @@ const state = day.status === 'cooked' ? 'cooked' : planned ? 'planned' : 'empty'
           <input type="hidden" name="status" value="planned" />
           <div class="field">
             <label>Ret</label>
-            <DishPicker dishes={dishes} date={day.date} />
+            <DishPicker options={options} date={day.date} />
           </div>
           <div class="field">
             <label>Note (valgfri)</label>
