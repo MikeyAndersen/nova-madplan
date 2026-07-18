@@ -93,6 +93,14 @@ CREATE TABLE IF NOT EXISTS recipe_images (
     mime TEXT NOT NULL
 );
 
+-- Feature B: forkastede forslag pr. uge. Ekskluderes fra kandidat-pulje + prompt.
+CREATE TABLE IF NOT EXISTS suggestion_rejections (
+    week_start TEXT NOT NULL,
+    dish_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (week_start, dish_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_history_dish ON history(dish_id);
 CREATE INDEX IF NOT EXISTS idx_suggest_queue_week ON suggest_queue(week_start, status);
 CREATE INDEX IF NOT EXISTS idx_suggestion_sets_week ON suggestion_sets(week_start);

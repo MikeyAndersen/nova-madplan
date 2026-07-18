@@ -1,33 +1,143 @@
 ---
-import type { Dish } from '../lib/api.types';
-
-interface Props {
-  dishes: Dish[];
-  date: string;
-}
-const { dishes, date } = Astro.props;
-const listId = `dishes-${date}`;
+import type { PickerOption } from '../lib/picker-options';
+interface Props { options: PickerOption[]; date: string; }
+const { options, date } = Astro.props;
+const json = JSON.stringify(options).replace(/</g, '\\u003c');
 ---
 
-<datalist id={listId}>
-  {dishes.map((d) => <option value={d.name} data-id={d.id}></option>)}
-</datalist>
-<input class="dish-input" list={listId} name="dish_name_display" placeholder="søg eller skriv ny ret…" autocomplete="off" />
-<input type="hidden" name="dish_id" value="" />
-<input type="hidden" name="new_dish_name" value="" />
-<script is:inline define:vars={{ listId }}>
+<div class="dish-picker" data-date={date}>
+  <input class="dish-input" type="text" autocomplete="off" role="combobox" aria-expanded="false"
+         placeholder="søg ret, opskrift eller AI-forslag…" />
+  <input type="hidden" name="dish_id" value="" />
+  <input type="hidden" name="recipe_id" value="" />
+  <input type="hidden" name="new_dish_name" value="" />
+  <div class="dish-menu" role="listbox" hidden></div>
+  <script type="application/json" class="dish-options" set:html={json}></script>
+</div>
+
+<script is:inline>
   (function () {
-    var form = document.currentScript.closest('form');
-    if (!form) return;
-    form.addEventListener('submit', function () {
-      var disp = form.querySelector('input[name="dish_name_display"]');
-      var list = document.getElementById(listId);
-      var hiddenId = form.querySelector('input[name="dish_id"]');
-      var hiddenNew = form.querySelector('input[name="new_dish_name"]');
-      var val = ((disp && disp.value) || '').trim();
-      var match = list && Array.prototype.find.call(list.options, function (o) { return o.value === val; });
-      if (match) { hiddenId.value = match.getAttribute('data-id'); hiddenNew.value = ''; }
-      else { hiddenId.value = ''; hiddenNew.value = val; }
-    });
+    function norm(s) {
+      return String(s || '').trim().toLowerCase()
+        .replace(/ø/g, 'o').replace(/å/g, 'a').replace(/æ/g, 'ae').replace(/\s+/g, ' ');
+    }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function badges(list) {
+      return list.map(function (b) {
+        if (b === 'opskrift') return '<span class="pk-badge pk-opskrift">📖 opskrift</span>';
+        if (b === 'ai') return '<span class="pk-badge pk-ai">✨ AI</span>';
+        return '<span class="pk-badge pk-ret">ret</span>';
+      }).join('');
+    }
+
+    function init(root) {
+      root.setAttribute('data-init', '1');
+      var input = root.querySelector('.dish-input');
+      var menu = root.querySelector('.dish-menu');
+      var hidId = root.querySelector('input[name="dish_id"]');
+      var hidRec = root.querySelector('input[name="recipe_id"]');
+      var hidNew = root.querySelector('input[name="new_dish_name"]');
+      var options = [];
+      try { options = JSON.parse(root.querySelector('.dish-options').textContent || '[]'); } catch (e) {}
+      var filtered = [];
+      var active = -1;
+
+      function hasCreateRow() {
+        var v = input.value.trim();
+        return !!v && !options.some(function (o) { return norm(o.label) === norm(v); });
+      }
+      function rowCount() { return filtered.length + (hasCreateRow() ? 1 : 0); }
+
+      function render() {
+        var q = input.value;
+        filtered = options.filter(function (o) { return norm(o.label).indexOf(norm(q)) >= 0; });
+        var html = filtered.map(function (o, i) {
+          return '<div class="pk-opt' + (i === active ? ' active' : '') + '" data-i="' + i + '" role="option">'
+            + '<span class="pk-label">' + esc(o.label) + '</span>'
+            + '<span class="pk-badges">' + badges(o.badges) + '</span></div>';
+        }).join('');
+        if (hasCreateRow()) {
+          var ci = filtered.length;
+          html += '<div class="pk-opt pk-create' + (active === ci ? ' active' : '') + '" data-i="' + ci + '" role="option">'
+            + '+ Opret “' + esc(input.value.trim()) + '” som ny ret</div>';
+        }
+        menu.innerHTML = html;
+        menu.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+      }
+      function paint() {
+        Array.prototype.forEach.call(menu.querySelectorAll('.pk-opt'), function (el) {
+          el.classList.toggle('active', Number(el.getAttribute('data-i')) === active);
+        });
+        var a = menu.querySelector('.pk-opt.active');
+        if (a) a.scrollIntoView({ block: 'nearest' });
+      }
+      function close() { menu.hidden = true; active = -1; input.setAttribute('aria-expanded', 'false'); }
+      function choose(i) {
+        hidId.value = ''; hidRec.value = ''; hidNew.value = '';
+        if (i >= 0 && i < filtered.length) {
+          var o = filtered[i];
+          input.value = o.label;
+          if (o.kind === 'dish') hidId.value = o.dishId;
+          else hidRec.value = o.recipeId;
+        } else {
+          hidNew.value = input.value.trim();
+        }
+        close();
+      }
+
+      input.addEventListener('input', function () { active = -1; render(); });
+      input.addEventListener('focus', function () { render(); });
+      input.addEventListener('keydown', function (e) {
+        var n = rowCount();
+        if (e.key === 'ArrowDown') { e.preventDefault(); if (menu.hidden) render(); active = n ? (active + 1) % n : -1; paint(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); active = n ? (active - 1 + n) % n : -1; paint(); }
+        else if (e.key === 'Enter') { if (!menu.hidden) { e.preventDefault(); choose(active < 0 ? 0 : active); } }
+        else if (e.key === 'Escape') { close(); }
+      });
+      menu.addEventListener('mousedown', function (e) {
+        var opt = e.target.closest('.pk-opt'); if (!opt) return;
+        e.preventDefault();
+        choose(Number(opt.getAttribute('data-i')));
+      });
+      input.addEventListener('blur', function () { setTimeout(close, 150); });
+
+      var form = input.closest('form');
+      if (form) form.addEventListener('submit', function () {
+        if (hidId.value || hidRec.value || hidNew.value) return;
+        var val = input.value.trim(); if (!val) return;
+        var match = options.filter(function (o) { return norm(o.label) === norm(val); })[0];
+        if (match) { if (match.kind === 'dish') hidId.value = match.dishId; else hidRec.value = match.recipeId; }
+        else hidNew.value = val;
+      });
+    }
+
+    document.querySelectorAll('.dish-picker:not([data-init])').forEach(init);
   })();
 </script>
+
+<style>
+  .dish-picker { position: relative; }
+  .dish-menu {
+    position: absolute; left: 0; right: 0; z-index: 20;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); margin-top: 2px; max-height: 16rem; overflow-y: auto;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  }
+  .pk-opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.5rem 0.6rem; cursor: pointer; font-size: 0.95rem;
+  }
+  .pk-opt.active, .pk-opt:hover { background: var(--surface-2); }
+  .pk-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pk-badges { display: flex; gap: 0.25rem; flex-shrink: 0; }
+  .pk-badge { font-size: 0.7rem; padding: 0.05rem 0.4rem; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .pk-ret { color: var(--muted); }
+  .pk-opskrift { background: color-mix(in srgb, var(--accent, #4a7) 14%, transparent); }
+  .pk-ai { background: color-mix(in srgb, #b58900 22%, transparent); }
+  .pk-create { font-weight: 600; }
+</style>

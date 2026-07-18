@@ -73,6 +73,19 @@ export interface ScrapePreview {
 	warning?: string;
 }
 
+export interface DishStat {
+	dish_id: number;
+	name: string;
+	times_made: number;
+	last_made: string | null;
+}
+
+export interface Stats {
+	total_cooked: number;
+	dishes: DishStat[];
+	per_month: { month: string; count: number }[];
+}
+
 export interface Suggestion {
 	date: string;
 	dish_id: number;

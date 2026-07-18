@@ -70,13 +70,30 @@ def load_active_dishes(conn) -> list[dict]:
     } for r in rows]
 
 
-def candidate_pool(dishes: list[dict], today: date) -> list[dict]:
+def candidate_pool(dishes: list[dict], today: date,
+                   exclude: set[int] | frozenset[int] = frozenset()) -> list[dict]:
     """Hård udelukkelse < 14 dage; falder kandidatmængden under 7, blødes op
-    til < 7 dage (§4.3). recurring_weekly er altid med."""
+    til < 7 dage (§4.3). recurring_weekly er altid med.
+
+    `exclude` = forkastede retter (Feature B): fjernes fra puljen, men **gen-inkluderes**
+    hvis puljen derved falder under 7 — en tom dag er værre end en gentagelse."""
     hard = [d for d in dishes if _eligible(d, today, config.SUGGEST_HARD_DAYS)]
-    if len(hard) >= 7:
-        return hard
-    return [d for d in dishes if _eligible(d, today, config.SUGGEST_SOFT_DAYS)]
+    pool = hard if len(hard) >= 7 else [d for d in dishes if _eligible(d, today, config.SUGGEST_SOFT_DAYS)]
+    if not exclude:
+        return pool
+    kept = [d for d in pool if d["id"] not in exclude]
+    if len(kept) >= 7:
+        return kept
+    excluded = [d for d in pool if d["id"] in exclude]
+    return kept + excluded[: max(0, 7 - len(kept))]
+
+
+def rejected_ids(conn, week_start: str) -> set[int]:
+    """Feature B: dish_id'er forkastet for ugen."""
+    rows = conn.execute(
+        "SELECT dish_id FROM suggestion_rejections WHERE week_start = ?", (week_start,)
+    ).fetchall()
+    return {r["dish_id"] for r in rows}
 
 
 # ── Scoring mod lager (§4.2) ────────────────────────────────────────
@@ -135,7 +152,8 @@ def _auto_reason(dish: dict, inv: list[dict], today: date) -> str:
 
 
 # ── 7b-ranking (Ollama) ─────────────────────────────────────────────
-def _build_prompt(cands: list[dict], inv: list[dict], dates: list[str], today: date) -> str:
+def _build_prompt(cands: list[dict], inv: list[dict], dates: list[str], today: date,
+                  avoid_names: list[str] | None = None) -> str:
     cand_json = [{
         "dish_id": d["id"], "name": d["name"], "tags": d["tags"],
         "days_since": _days_since(d["last_made"], today),
@@ -143,12 +161,17 @@ def _build_prompt(cands: list[dict], inv: list[dict], dates: list[str], today: d
         "coverage": round(coverage(d, inv), 2),
     } for d in cands]
     inv_json = [{"name": i.get("name"), "bucket": i.get("bucket")} for i in inv]
+    avoid_line = ""
+    if avoid_names:
+        avoid_line = (f"UNDGÅ disse retter (nyligt forkastet af brugeren): "
+                      f"{json.dumps(avoid_names, ensure_ascii=False)}\n")
     return (
         "Du planlægger aftensmad for en dansk husstand for én uge.\n"
         "Vælg én ret pr. dag ud fra KANDIDATER (brug kun dish_id derfra).\n"
         "Vægt: ingredienser på lager, variation, og retter der ikke er lavet længe.\n"
         "Svar KUN med JSON: {\"suggestions\":[{\"date\":\"YYYY-MM-DD\",\"dish_id\":N,"
         "\"reason\":\"kort dansk begrundelse\",\"confidence\":0.0-1.0}]}\n\n"
+        f"{avoid_line}"
         f"DATOER: {json.dumps(dates)}\n"
         f"KANDIDATER: {json.dumps(cand_json, ensure_ascii=False)}\n"
         f"LAGER: {json.dumps(inv_json, ensure_ascii=False)}\n"
@@ -174,12 +197,13 @@ def _extract_suggestions(text: str) -> list[dict]:
 
 async def rank_with_llm(cands: list[dict], inv: list[dict], dates: list[str],
                         today: date, *, model: str | None = None,
-                        url: str | None = None) -> list[dict]:
+                        url: str | None = None,
+                        avoid_names: list[str] | None = None) -> list[dict]:
     """Kald Ollama (7b default, 32b i drain). Returnerer rå forslag
     (uvaliderede). Kaster ved fejl — kalderen falder tilbage."""
     payload = {
         "model": model or config.OLLAMA_MODEL,
-        "prompt": _build_prompt(cands, inv, dates, today),
+        "prompt": _build_prompt(cands, inv, dates, today, avoid_names=avoid_names),
         "stream": False, "format": "json",
         "options": {"temperature": 0.4},
     }
@@ -374,12 +398,14 @@ async def generate(force: bool = False) -> dict | None:
         if not force and prev and prev.get("inventory_hash") == new_hash:
             return None
         dishes = load_active_dishes(conn)
+        rejected = rejected_ids(conn, week_start.isoformat())
 
     today = _today()
-    pool = candidate_pool(dishes, today)
+    pool = candidate_pool(dishes, today, exclude=rejected)
+    avoid = [d["name"] for d in dishes if d["id"] in rejected]
     dates = [(week_start + timedelta(days=i)).isoformat() for i in range(7)]
     try:
-        raw = await rank_with_llm(pool, inv, dates, today)
+        raw = await rank_with_llm(pool, inv, dates, today, avoid_names=avoid)
     except Exception:
         log.exception("7b-ranking fejlede — bruger deterministisk rangering")
         raw = []

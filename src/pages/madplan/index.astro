@@ -4,13 +4,17 @@ import MealCard from '../../components/MealCard.astro';
 import QuickfillPanel from '../../components/QuickfillPanel.astro';
 import { getApi, ApiError } from '../../lib/api';
 import { mondayOf, addDaysISO, dayMonthDa } from '../../lib/dates';
-import type { WeekPlan, Dish } from '../../lib/api.types';
+import { buildPickerOptions } from '../../lib/picker-options';
+import type { WeekPlan, Dish, Recipe } from '../../lib/api.types';
 
 const startParam = Astro.url.searchParams.get('start');
 const hasError = Astro.url.searchParams.get('error') === '1';
 const api = await getApi();
 let plan: WeekPlan | null = null;
 let dishes: Dish[] = [];
+let recipes: Recipe[] = [];
+const suggestionDishIds = new Set<number>();
+const counts = new Map<number, number>();
 let loadError = '';
 try {
   plan = startParam ? await api.getWeekplan(startParam) : await api.getCurrentWeekplan();
@@ -18,6 +22,17 @@ try {
 } catch (e) {
   loadError = e instanceof ApiError ? `Kunne ikke hente madplanen (${e.status}).` : 'Kunne ikke nå madplan-tjenesten.';
 }
+// Ekstra kilder til ret-vælgeren; alle valgfri — vælgeren virker med bare retter.
+try { recipes = await api.listRecipes(); } catch { /* ignore */ }
+try {
+  const set = await api.getSuggestions();
+  for (const s of set.suggestions) suggestionDishIds.add(s.dish_id);
+} catch { /* ignore */ }
+try {
+  const stats = await api.getStats();
+  for (const d of stats.dishes) counts.set(d.dish_id, d.times_made);
+} catch { /* ignore */ }
+const pickerOptions = buildPickerOptions(dishes, recipes, suggestionDishIds, counts);
 const ws = plan?.week_start ?? mondayOf(new Date());
 const prev = addDaysISO(ws, -7);
 const next = addDaysISO(ws, 7);
@@ -36,7 +51,7 @@ const range = `${dayMonthDa(ws)} – ${dayMonthDa(addDaysISO(ws, 6))}`;
   {plan && <QuickfillPanel weekStart={ws} dishes={dishes} />}
   {plan && (
     <div class="cards">
-      {plan.days.map((d) => <MealCard day={d} dishes={dishes} weekStart={ws} />)}
+      {plan.days.map((d) => <MealCard day={d} dishes={dishes} options={pickerOptions} weekStart={ws} />)}
     </div>
   )}
 </Layout>
