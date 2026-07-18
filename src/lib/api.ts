@@ -49,6 +49,11 @@ export function makeApi(base: string, token: string, fetchImpl: typeof fetch = f
 		refreshSuggestions: () => call<void>('/api/suggestions/refresh', { method: 'POST' }),
 		acceptSuggestion: (date: string, dish_id: number) =>
 			call<WeekPlan>('/api/suggestions/accept', { method: 'POST', body: JSON.stringify({ date, dish_id }) }),
+		getRejections: () => call<{ week_start: string; dish_ids: number[] }>('/api/suggestions/rejections'),
+		rejectSuggestion: (dish_id: number) =>
+			call<void>('/api/suggestions/reject', { method: 'POST', body: JSON.stringify({ dish_id }) }),
+		rejectAllSuggestions: () => call<void>('/api/suggestions/reject-all', { method: 'POST' }),
+		resetRejections: () => call<void>('/api/suggestions/reset-rejections', { method: 'POST' }),
 		listInventory: (filter: { q?: string; category?: string } = {}) => {
 			const p = new URLSearchParams();
 			if (filter.q) p.set('q', filter.q);

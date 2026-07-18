@@ -7,12 +7,15 @@ import type { SuggestionSet } from '../lib/api.types';
 const hasError = Astro.url.searchParams.get('error') === '1';
 const api = await getApi();
 let set: SuggestionSet | null = null;
+let rejected: number[] = [];
 let err = '';
 try {
   set = await api.getSuggestions();
 } catch (e) {
   err = e instanceof ApiError ? `Kunne ikke hente forslag (${e.status}).` : 'Kunne ikke nå tjenesten.';
 }
+try { rejected = (await api.getRejections()).dish_ids; } catch { /* ignore */ }
+const rejectedSet = new Set(rejected);
 ---
 
 <Layout title="AI-forslag">
@@ -25,50 +28,71 @@ try {
         <h2>Næste uge · {set.week_start}</h2>
         <span class="tag">{set.quality === 'reviewed' ? '⭐ Gennemgået' : 'Hurtig'}</span>
       </div>
-      <div class="row" style="gap:0.5rem; margin-bottom:0.8rem;">
+      <div class="row" style="gap:0.5rem; margin-bottom:0.8rem; flex-wrap:wrap;">
         <form method="post" action="/api/suggestions/accept">
           <input type="hidden" name="all" value="1" />
           <input type="hidden" name="week_start" value={set.week_start} />
           <button class="btn-primary" type="submit">Accepter hele ugen</button>
         </form>
         <button id="recompute" class="btn-sm" type="button">Genberegn</button>
+        <button id="reject-all" class="btn-sm" type="button">👎 Forkast alle og genberegn</button>
+        {rejected.length > 0 && (
+          <form method="post" action="/api/suggestions/reset-rejections">
+            <button class="btn-sm" type="submit">Nulstil forkastede ({rejected.length})</button>
+          </form>
+        )}
         <span id="recompute-status" class="small muted"></span>
       </div>
+      {rejected.length > 0 && (
+        <p class="small muted">Forkastede retter undgås ved næste Genberegn.</p>
+      )}
       {set.suggestions.length === 0 && <p class="empty">Ingen forslag endnu. Tryk Genberegn.</p>}
       <div class="cards">
-        {set.suggestions.map((s) => (
-          <div class="card">
-            <div class="row spread"><strong>{s.dish_name}</strong><span class="tag">{dayMonthDa(s.date)}</span></div>
-            <div class="small muted">{s.reason}</div>
-            <div class="small">Sikkerhed: {Math.round(s.confidence * 100)}%</div>
-            <form method="post" action="/api/suggestions/accept" style="margin-top:0.5rem;">
-              <input type="hidden" name="date" value={s.date} />
-              <input type="hidden" name="dish_id" value={s.dish_id} />
-              <button class="btn-sm" type="submit">Accepter</button>
-            </form>
-          </div>
-        ))}
+        {set.suggestions.map((s) => {
+          const isRejected = rejectedSet.has(s.dish_id);
+          return (
+            <div class={`card${isRejected ? ' card-rejected' : ''}`}>
+              <div class="row spread"><strong>{s.dish_name}</strong><span class="tag">{dayMonthDa(s.date)}</span></div>
+              <div class="small muted">{s.reason}</div>
+              <div class="small">Sikkerhed: {Math.round(s.confidence * 100)}%</div>
+              {isRejected ? (
+                <div class="small" style="margin-top:0.5rem;">👎 Forkastet — undgås ved Genberegn.</div>
+              ) : (
+                <div class="row" style="gap:0.4rem; margin-top:0.5rem;">
+                  <form method="post" action="/api/suggestions/accept">
+                    <input type="hidden" name="date" value={s.date} />
+                    <input type="hidden" name="dish_id" value={s.dish_id} />
+                    <button class="btn-sm" type="submit">Accepter</button>
+                  </form>
+                  <form method="post" action="/api/suggestions/reject">
+                    <input type="hidden" name="dish_id" value={s.dish_id} />
+                    <button class="btn-sm" type="submit">👎 Forkast</button>
+                  </form>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </>
   )}
   <script is:inline define:vars={{ before: set?.updated_at ?? '' }}>
     (function () {
-      var btn = document.getElementById('recompute');
       var status = document.getElementById('recompute-status');
-      if (!btn) return;
-      btn.addEventListener('click', async function () {
-        btn.disabled = true;
-        status.textContent = 'Arbejder… (7b på CPU kan tage 1–2 min)';
-        try {
-          await fetch('/api/suggestions/refresh', { method: 'POST' });
-          var started = Date.now();
-          var timer = setInterval(async function () {
-            if (Date.now() - started > 180000) {
-              clearInterval(timer);
-              status.textContent = 'Tog for lang tid — genindlæs siden.';
-              btn.disabled = false;
-              return;
-            }
+      var recompute = document.getElementById('recompute');
+      var rejectAll = document.getElementById('reject-all');
+
+      function pollUntilFresh() {
+        var started = Date.now();
+        var timer = setInterval(async function () {
+          if (Date.now() - started > 180000) {
+            clearInterval(timer);
+            status.textContent = 'Tog for lang tid — genindlæs siden.';
+            if (recompute) recompute.disabled = false;
+            if (rejectAll) rejectAll.disabled = false;
+            return;
+          }
+          try {
             var r = await fetch('/api/suggestions/poll');
             var j = await r.json();
             if (j.updated_at && j.updated_at !== before) {
@@ -76,12 +100,27 @@ try {
               status.textContent = 'Færdig — genindlæser…';
               location.reload();
             }
-          }, 5000);
-        } catch (e) {
-          status.textContent = 'Kunne ikke starte genberegning.';
-          btn.disabled = false;
-        }
+          } catch (e) { /* keep polling */ }
+        }, 5000);
+      }
+
+      if (recompute) recompute.addEventListener('click', async function () {
+        recompute.disabled = true;
+        status.textContent = 'Arbejder… (7b på CPU kan tage 1–2 min)';
+        try { await fetch('/api/suggestions/refresh', { method: 'POST' }); pollUntilFresh(); }
+        catch (e) { status.textContent = 'Kunne ikke starte genberegning.'; recompute.disabled = false; }
+      });
+
+      if (rejectAll) rejectAll.addEventListener('click', async function () {
+        rejectAll.disabled = true;
+        status.textContent = 'Forkaster alle og genberegner…';
+        try { await fetch('/api/suggestions/reject-all', { method: 'POST' }); pollUntilFresh(); }
+        catch (e) { status.textContent = 'Kunne ikke starte.'; rejectAll.disabled = false; }
       });
     })();
   </script>
 </Layout>
+
+<style>
+  .card-rejected { opacity: 0.55; }
+</style>
