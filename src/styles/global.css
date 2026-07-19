@@ -315,3 +315,65 @@ details.editor > summary::-webkit-details-marker { display: none; }
 }
 
 hr.sep { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+
+/* ---------- Mobil bund-navigation ---------- */
+
+.tabbar { display: none; }
+.more-sheet, .more-backdrop { display: none; }
+
+@media (max-width: 39.99rem) {
+  /* Skjul top-nav; bund-tabbar overtager. */
+  .nav { display: none; }
+  .tabbar {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 30;
+    background: var(--nav-bg);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .container { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+  .more-sheet, .more-backdrop { display: block; }
+}
+
+.tab {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  min-height: 3.4rem;
+  padding: 0.4rem 0.15rem;
+  border: none; background: none; border-radius: 0;
+  color: var(--muted); text-decoration: none; font-weight: 600;
+}
+.tab .tab-icon { font-size: 1.3rem; line-height: 1; }
+.tab .tab-label { font-size: 0.68rem; white-space: nowrap; }
+.tab.active { color: var(--accent); }
+.tab:active { background: var(--surface-2); }
+
+.more-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, 0.35);
+}
+.more-sheet {
+  position: fixed; z-index: 41;
+  left: 0.5rem; right: 0.5rem;
+  bottom: calc(3.7rem + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0.4rem;
+}
+.more-item {
+  display: flex; align-items: center; gap: 0.7rem;
+  width: 100%; text-align: left;
+  padding: 0.75rem 0.8rem;
+  border: none; background: none; border-radius: var(--radius-sm);
+  color: var(--ink); text-decoration: none; font-weight: 600; font-size: 1rem;
+  min-height: auto;
+}
+.more-item .tab-icon { font-size: 1.15rem; }
+.more-item.active { color: var(--accent); background: var(--surface-2); }
+.more-item:active { background: var(--surface-2); }

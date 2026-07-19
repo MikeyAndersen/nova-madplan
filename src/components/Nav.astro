@@ -1,6 +1,7 @@
 ---
 const path = Astro.url.pathname;
 
+// Top-nav (desktop): alle punkter som hidtil.
 const links: { href: string; label: string }[] = [
   { href: '/', label: 'Forside' },
   { href: '/madplan', label: 'Madplan' },
@@ -11,10 +12,24 @@ const links: { href: string; label: string }[] = [
   { href: '/statistik', label: 'Statistik' },
 ];
 
+// Bund-tabbar (mobil): 4 primære + Mere.
+const primary = [
+  { href: '/madplan', label: 'Madplan', icon: '📅' },
+  { href: '/forslag', label: 'Forslag', icon: '✨' },
+  { href: '/opskrifter', label: 'Opskrifter', icon: '📖' },
+  { href: '/beholdning', label: 'Beholdning', icon: '📦' },
+];
+const more = [
+  { href: '/retter', label: 'Retter', icon: '🍽️' },
+  { href: '/statistik', label: 'Statistik', icon: '📊' },
+  { href: '/', label: 'Forside', icon: '🏠' },
+];
+
 function isActive(href: string): boolean {
   if (href === '/') return path === '/';
   return path === href || path.startsWith(href + '/');
 }
+const moreActive = more.some((m) => isActive(m.href));
 ---
 
 <nav class="nav">
@@ -24,6 +39,49 @@ function isActive(href: string): boolean {
         <a href={l.href} class={isActive(l.href) ? 'active' : ''}>{l.label}</a>
       ))}
     </div>
-    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Skift lyst/mørkt tema" title="Skift tema">🌙</button>
+    <button class="theme-toggle" type="button" aria-label="Skift lyst/mørkt tema" title="Skift tema">🌙</button>
   </div>
 </nav>
+
+<nav class="tabbar" aria-label="Hovednavigation">
+  {primary.map((t) => (
+    <a href={t.href} class={`tab${isActive(t.href) ? ' active' : ''}`}>
+      <span class="tab-icon">{t.icon}</span>
+      <span class="tab-label">{t.label}</span>
+    </a>
+  ))}
+  <button id="more-btn" class={`tab${moreActive ? ' active' : ''}`} type="button" aria-haspopup="true" aria-expanded="false">
+    <span class="tab-icon">⋯</span>
+    <span class="tab-label">Mere</span>
+  </button>
+</nav>
+
+<div id="more-backdrop" class="more-backdrop" hidden></div>
+<div id="more-sheet" class="more-sheet" role="menu" aria-label="Mere" hidden>
+  {more.map((m) => (
+    <a href={m.href} class={`more-item${isActive(m.href) ? ' active' : ''}`} role="menuitem">
+      <span class="tab-icon">{m.icon}</span>{m.label}
+    </a>
+  ))}
+  <button class="more-item theme-toggle" type="button" aria-label="Skift lyst/mørkt tema">
+    <span class="tab-icon">🌙</span><span class="tt-label">Skift tema</span>
+  </button>
+</div>
+
+<script is:inline>
+  (function () {
+    var btn = document.getElementById('more-btn');
+    var sheet = document.getElementById('more-sheet');
+    var backdrop = document.getElementById('more-backdrop');
+    if (!btn || !sheet || !backdrop) return;
+    function open() { sheet.hidden = false; backdrop.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+    function close() { sheet.hidden = true; backdrop.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+    btn.addEventListener('click', function () { sheet.hidden ? open() : close(); });
+    backdrop.addEventListener('click', close);
+    // Luk hvis man rammer et link eller tema-skift i arket.
+    sheet.addEventListener('click', function (e) {
+      if (e.target.closest('a') || e.target.closest('.theme-toggle')) close();
+    });
+    window.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  })();
+</script>
